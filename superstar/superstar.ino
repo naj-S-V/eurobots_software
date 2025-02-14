@@ -31,6 +31,7 @@ const int maxInt = 0;
 //                           Setup
 // ================================================================
 void setup() {
+  Serial.begin(9600);
   delay(5000);
   pinMode(CPT_LEFT, INPUT);
   pinMode(CPT_RIGHT, INPUT);
@@ -66,11 +67,18 @@ void loop() {
     motorRight->run(RELEASE);
     return;     
   } else {
-    isSurfaceBelow = true; 
+    isSurfaceBelow = true;
   }
 
   bool left = digitalRead(CPT_LEFT);   
   bool right = digitalRead(CPT_RIGHT);
+
+  if(!left){
+    Serial.println("left");
+  }
+  if(!right){
+    Serial.println("right");
+  }
 
   if (!left && !right) {
     motorLeft->setSpeed(speed);
@@ -91,6 +99,6 @@ void loop() {
     motorLeft->run(FORWARD);
     motorRight->run(FORWARD);
   }
-  Serial.println(speed);
+  //Serial.println(speed);
   delay(10);
 }
