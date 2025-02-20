@@ -8,20 +8,19 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 // ================================================================
 //                           Connection
 // ================================================================
-#define CPT_LEFT 8
-#define CPT_RIGHT 7
-#define CPT_US_TRIG_PIN 10
-#define CPT_US_ECHO_PIN 9
+#define CPT_LEFT 3
+#define CPT_RIGHT 6
+#define CPT_US_TRIG_PIN 13
+#define CPT_US_ECHO_PIN 8
 
 // ================================================================
 //                           Parameters
 // ================================================================
 
-volatile int speed = 255; // base speed 65
+volatile int speed = 65;
 
 float distance = 0.0;
 const float threshold = 5.0;
-bool isSurfaceBelow = true;
 
 volatile int counter = 1;
 const int maxInt = 0;
@@ -47,12 +46,12 @@ void setup() {
 // ================================================================
 void loop() {
   digitalWrite(CPT_US_TRIG_PIN, LOW);
-  delayMicroseconds(5); // verifier la valeur 
+  delayMicroseconds(2);
   digitalWrite(CPT_US_TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(CPT_US_TRIG_PIN, LOW);
 
-  long duration = pulseIn(CPT_US_ECHO_PIN, HIGH, 30000);
+  long duration = pulseIn(CPT_US_ECHO_PIN, HIGH, 10000);
   distance = (duration * .0343) / 2; 
 
   // Check if this is a good solution.
@@ -62,14 +61,13 @@ void loop() {
   // }
 
   if (distance >= threshold) {
-    isSurfaceBelow = false; 
     motorLeft->run(RELEASE);
     motorRight->run(RELEASE);
     Serial.println(String(distance) + ": halte");
+    delay(10);
     return;     
   } else {
     Serial.println(distance);
-    isSurfaceBelow = true;
   }
 
   bool left = digitalRead(CPT_LEFT);   
@@ -80,7 +78,6 @@ void loop() {
     motorRight->setSpeed(speed);
     motorRight->run(FORWARD);
     Serial.println("Left");
-    // des que qu'on rentre dans cette condition le capteur US ne fonctionne plus comme il devrait
   } else if (left && !right) {
     motorRight->run(RELEASE);
     motorLeft->setSpeed(speed);
@@ -93,8 +90,5 @@ void loop() {
     motorRight->run(FORWARD);
     Serial.println("Forward");
   }
-  //Serial.println(speed);
-  delay(1000);
+  delay(10);
 }
-
-// 
