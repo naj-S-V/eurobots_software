@@ -8,10 +8,10 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 // ================================================================
 //                           Connection
 // ================================================================
+
 #define CPT_LEFT 3
 #define CPT_RIGHT 6
-#define CPT_US_TRIG_PIN 13
-#define CPT_US_ECHO_PIN 8
+#define CPT_VOID 7
 
 // ================================================================
 //                           Parameters
@@ -19,11 +19,7 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 
 volatile int speed = 65;
 
-float distance = 0.0;
-const float threshold = 5.0;
-
-volatile int counter = 1;
-const int maxInt = 0;
+const bool motOff = false;
 
 
 // ================================================================
@@ -34,9 +30,7 @@ void setup() {
   delay(5000);
   pinMode(CPT_LEFT, INPUT);
   pinMode(CPT_RIGHT, INPUT);
-
-  pinMode(CPT_US_TRIG_PIN, OUTPUT);
-  pinMode(CPT_US_ECHO_PIN, INPUT);
+  pinMode(CPT_VOID, INPUT);
 
   AFMS.begin();
 }
@@ -45,29 +39,19 @@ void setup() {
 //                           Loop
 // ================================================================
 void loop() {
-  digitalWrite(CPT_US_TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(CPT_US_TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(CPT_US_TRIG_PIN, LOW);
+  bool isVoid = digitalRead(CPT_VOID);
 
-  long duration = pulseIn(CPT_US_ECHO_PIN, HIGH, 10000);
-  distance = (duration * .0343) / 2; 
-
-  // Check if this is a good solution.
-  // counter = counter + 1;
-  // if (counter >= 600){
-  //   speed = 40;
-  // }
-
-  if (distance >= threshold) {
+  if (isVoid) {
     motorLeft->run(RELEASE);
     motorRight->run(RELEASE);
-    Serial.println(String(distance) + ": halte");
+    Serial.println("halte");
     delay(10);
     return;     
-  } else {
-    Serial.println(distance);
+  }
+
+  if(motOff){
+    delay(10);
+    return;
   }
 
   bool left = digitalRead(CPT_LEFT);   
