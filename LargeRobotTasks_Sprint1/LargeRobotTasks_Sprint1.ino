@@ -1,12 +1,10 @@
-// Configuration hardware : Les broches IN du driver moteur sont connectées aux pins du Arduino Mega de 4 à 7
-// To Do : Ajouter les encodeurs dans le code
-
 #define IN1 4
 #define IN2 5
 #define IN3 6
-#define IN4 7
+#define IN4 8
 #define MOTOR_SPEED 150
-#define MOVE_TIME 2000
+#define MOTOR_SPEED_SLOW (MOTOR_SPEED)
+#define MOVE_TIME 5000
 
 enum State {
   IDLE,
@@ -15,7 +13,7 @@ enum State {
 };
 
 State currentState = IDLE;
-unsigned long startTime = 0;
+unsigned long startTime = 3000;
 
 void setup() {
   pinMode(IN1, OUTPUT);
@@ -50,9 +48,9 @@ void loop() {
 }
 
 void moveForward() {
-  digitalWrite(IN1, HIGH);
+  analogWrite(IN1, MOTOR_SPEED);
   digitalWrite(IN2, LOW);
-  digitalWrite(IN3, HIGH);
+  analogWrite(IN3, MOTOR_SPEED_SLOW);
   digitalWrite(IN4, LOW);
 }
 
