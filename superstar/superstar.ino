@@ -14,6 +14,8 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 #define CPT_VOID 7
 #define CPT_US_RIGHT_TRIG_PIN 10
 #define CPT_US_RIGHT_ECHO_PIN 8
+#define CPT_US_LEFT_TRIG_PIN 13
+#define CPT_US_LEFT_ECHO_PIN 11
 
 // ================================================================
 //                           Parameters
@@ -25,17 +27,18 @@ const bool motOff = false;
 const int stopAfterSec = 10000;
 const int delayStartSec = 5;
 const float obstacleThreshold = 20.0;
-const int ultrasonicInterval = 100;
+const int ultrasonicInterval = 150;
 
 // ================================================================
 //                           Initialisation
 // ================================================================
 
 int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
-float obstacleDistance = 0.0;
+float obstacleRightDistance = 0.0;
+float obstacleLeftDistance = 0.0;
 unsigned long startTime;
-
 unsigned long lastUltrasonicCheck = 0;
+bool currentSensor = false;
 
 // ================================================================
 //                           FSM States
@@ -61,6 +64,8 @@ void setup() {
 
   pinMode(CPT_US_RIGHT_TRIG_PIN, OUTPUT);
   pinMode(CPT_US_RIGHT_ECHO_PIN, INPUT);
+  pinMode(CPT_US_LEFT_TRIG_PIN, OUTPUT);
+  pinMode(CPT_US_LEFT_ECHO_PIN, INPUT);
   
   AFMS.begin();
   startTime = millis();
@@ -71,12 +76,18 @@ void setup() {
 // ================================================================
 void loop() {
   unsigned long elapsedTime = millis() - startTime;
-
   unsigned long currentTime = millis();
 
   if (currentTime - lastUltrasonicCheck >= ultrasonicInterval) {
     lastUltrasonicCheck = currentTime;
-    obstacleDistance = readUS();
+    
+    if (currentSensor) {
+      obstacleLeftDistance = readUltrasonic(CPT_US_LEFT_TRIG_PIN, CPT_US_LEFT_ECHO_PIN);
+    } else {
+      obstacleRightDistance = readUltrasonic(CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN);
+    }
+    
+    currentSensor = !currentSensor;
   }
   
   switch (currentState) {
@@ -92,15 +103,15 @@ void loop() {
       Serial.println("Moving...");
       if (digitalRead(CPT_VOID)) {
         currentState = AVOID_OBSTACLE;
-        break;
-      } else if (obstacleDistance <= obstacleThreshold && obstacleDistance != 0){
+      } else if (obstacleRightDistance <= obstacleThreshold && obstacleRightDistance != 0){
         currentState = AVOID_OBSTACLE;
-        break;
+      } else if (obstacleLeftDistance <= obstacleThreshold && obstacleLeftDistance != 0){
+        currentState = AVOID_OBSTACLE;
       } else if (motOff || elapsedTime >= maxTime) {
         currentState = STOPPED;
-        break;
+      } else {
+        moveRobot();
       }
-      moveRobot();
       break;
     
     case AVOID_OBSTACLE:
@@ -147,14 +158,14 @@ void stopMotors() {
   motorRight->run(RELEASE);
 }
 
-float readUS(){
-  digitalWrite(CPT_US_RIGHT_TRIG_PIN, LOW);
+float readUltrasonic(int trigPin, int echoPin){
+  digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
-  digitalWrite(CPT_US_RIGHT_TRIG_PIN, HIGH);
+  digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
-  digitalWrite(CPT_US_RIGHT_TRIG_PIN, LOW);
+  digitalWrite(trigPin, LOW);
 
-  long duration = pulseIn(CPT_US_RIGHT_ECHO_PIN, HIGH, 4000);
+  long duration = pulseIn(echoPin, HIGH, 4000);
   return (duration * .0343) / 2; 
 }
 
