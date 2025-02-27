@@ -13,13 +13,29 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 #define CPT_RIGHT 6
 #define CPT_VOID 7
 
+// #define CPT_US_RIGHT_TRIG_PIN 8
+// #define CPT_US_RIGHT_ECHO_PIN 11
+
 // ================================================================
 //                           Parameters
 // ================================================================
 
 volatile int speed = 65;
 
+const float threshold = 10.0;
+
 const bool motOff = false;
+
+const int stopAfterSec = 10;
+
+const int delayStartSec = 5; 
+
+// ================================================================
+//                           Initilialisation
+// ================================================================
+
+int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
+float distance = 0.0;
 
 
 // ================================================================
@@ -27,10 +43,13 @@ const bool motOff = false;
 // ================================================================
 void setup() {
   Serial.begin(9600);
-  delay(5000);
+  delay(delayStartSec * 1000);
   pinMode(CPT_LEFT, INPUT);
   pinMode(CPT_RIGHT, INPUT);
   pinMode(CPT_VOID, INPUT);
+
+  // pinMode(CPT_US_RIGHT_TRIG_PIN, OUTPUT);
+  // pinMode(CPT_US_RIGHT_ECHO_PIN, INPUT);
 
   AFMS.begin();
 }
@@ -39,17 +58,41 @@ void setup() {
 //                           Loop
 // ================================================================
 void loop() {
+  Serial.println(String(maxTime) + "-" + String(millis()));
+
   bool isVoid = digitalRead(CPT_VOID);
+
+  // digitalWrite(CPT_US_RIGHT_TRIG_PIN, LOW);
+  // delayMicroseconds(2);
+  // digitalWrite(CPT_US_RIGHT_TRIG_PIN, HIGH);
+  // delayMicroseconds(10);
+  // digitalWrite(CPT_US_RIGHT_TRIG_PIN, LOW);
+
+  // long duration = pulseIn(CPT_US_RIGHT_ECHO_PIN, HIGH, 30000);
+  // distance = (duration * .0343) / 2;
+
+  // if (distance <= threshold && distance != 0) {
+  //   motorLeft->run(RELEASE);
+  //   motorRight->run(RELEASE);
+  //   Serial.println(String(distance) + ": halte");
+  //   delay(10);
+  //   return;     
+  // } else {
+  //   Serial.println(distance);
+  // }
 
   if (isVoid) {
     motorLeft->run(RELEASE);
     motorRight->run(RELEASE);
-    Serial.println("halte");
+    // Serial.println("halte");
     delay(10);
     return;     
   }
 
-  if(motOff){
+  if(motOff || maxTime <= millis()){
+    motorLeft->run(RELEASE);
+    motorRight->run(RELEASE);
+    Serial.println("Halte motor !");
     delay(10);
     return;
   }
