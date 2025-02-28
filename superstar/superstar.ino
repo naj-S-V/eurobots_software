@@ -24,10 +24,10 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 volatile int speed = 65;
 
 const bool motOff = false;
-const int stopAfterSec = 10000;
+const int stopAfterSec = 15;
 const int delayStartSec = 5;
-const float obstacleThreshold = 20.0;
-const int ultrasonicInterval = 150;
+const float obstacleThreshold = 25.0;
+const int ultrasonicInterval = 200;
 
 // ================================================================
 //                           Initialisation
@@ -93,14 +93,12 @@ void loop() {
   switch (currentState) {
     
     case IDLE:
-      Serial.println("Waiting to start...");
       if (elapsedTime >= delayStartSec * 1000) {
         currentState = RUNNING;
       }
       break;
     
     case RUNNING:
-      Serial.println("Moving...");
       if (digitalRead(CPT_VOID)) {
         currentState = AVOID_OBSTACLE;
       } else if (obstacleRightDistance <= obstacleThreshold && obstacleRightDistance != 0){
@@ -115,13 +113,11 @@ void loop() {
       break;
     
     case AVOID_OBSTACLE:
-      Serial.println("Obstacle detected! Stopping...");
       stopMotors();
       currentState = RUNNING;
       break;
     
     case STOPPED:
-      Serial.println("Halte motor !");
       stopMotors();
       break;
   }
@@ -138,18 +134,15 @@ void moveRobot() {
     motorLeft->run(RELEASE);
     motorRight->setSpeed(speed);
     motorRight->run(FORWARD);
-    Serial.println("Turning Left");
   } else if (left && !right) {
     motorRight->run(RELEASE);
     motorLeft->setSpeed(speed);
     motorLeft->run(FORWARD);
-    Serial.println("Turning Right");
   } else {
     motorLeft->setSpeed(speed);
     motorRight->setSpeed(speed);
     motorLeft->run(FORWARD);
     motorRight->run(FORWARD);
-    Serial.println("Moving Forward");
   }
 }
 
