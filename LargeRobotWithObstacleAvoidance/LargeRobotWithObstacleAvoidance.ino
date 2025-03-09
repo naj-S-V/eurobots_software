@@ -54,12 +54,13 @@ enum State {
 };
 
 enum Obstacle {
-  FORWARD,
-  BACKWARD,
-  LEFT,
-  RIGHT,
-  NONE
-}
+  NONE = 0,
+  FORWARD = 1 << 0,  // 0001
+  BACKWARD = 1 << 1, // 0010
+  LEFT = 1 << 2,     // 0100
+  RIGHT = 1 << 3     // 1000
+};
+
 
 State currentState = IDLE;
 unsigned long startTime = 3000;
@@ -82,7 +83,7 @@ void setup() {
 }
 
 void loop() {
-  checkUltrason();
+  handleObstacle();  
   switch (currentState) {
     case IDLE:
       stopMotors();
@@ -119,52 +120,85 @@ void loop() {
   }
 }
 void checkUltrason() {
+
   for (int i = 0; i < sensorCount; i++) {    
     digitalWrite(sensor[i].trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(sensor[i].trigPin, HIGH);
     delayMicroseconds(10);
     digitalWrite(sensor[i].trigPin, LOW);
-    long obstacle_duration = pulseIn(sensor[i].trigPin, HIGH, 3000);
+    long obstacle_duration = pulseIn(sensor[i].echoPin, HIGH, 3000);
     if (obstacle_duration == 0) {
       sensor[i].distance = 100;
     }
     else {
       sensor[i].distance = obstacle_duration * 0.034/2;
     }
-    if (sensor[i].distance <= 15){
-      sensor[i].isNear = true;
+    sensors[i].isNear = (sensors[i].distance <= 15);
+  }
+
+}
+
+
+int detectObstacles() {
+  checkUltrason();
+  int detected = NONE;
+
+  if (sensors[0].isNear || sensors[1].isNear) {
+    detected |= FORWARD;
+  }
+  if (sensors[2].isNear || sensors[3].isNear) {
+    detected |= BACKWARD;
+  }
+  if (sensors[4].isNear) {
+    detected |= LEFT;
+  }
+  if (sensors[5].isNear) {
+    detected |= RIGHT;
+  }
+
+  return detected;
+}
+
+void handleObstacles() {
+  int obstacles = detectObstacles();
+
+  int count = 0;
+  if (obstacles & FORWARD) count++;
+  if (obstacles & BACKWARD) count++;
+  if (obstacles & LEFT) count++;
+  if (obstacles & RIGHT) count++;
+
+  if (count > 1) {
+    stopMotors();
+    Serial.println("STOPPING: Multiple obstacles detected.");
+    return;
+  }
+
+  if (obstacles & FORWARD) {
+    Serial.println("Obstacle in FRONT: Turning RIGHT until clear.");
+    while (detectObstacles() & FORWARD) {
+      turnRight();
+      delay(100);
     }
   }
+  
+  else if (obstacles & BACKWARD) {
+    Serial.println("Obstacle at BACK: Turning RIGHT.");
+    turnRight();
+  }
 
-}
-
-
-void handleObstacleAvoidance() {
-  if  
-  unsigned long now = millis();
-
-  switch (avoidance_state) {
-    case 0: // Début de l'évitement, tourner à gauche
-      Serial.println("Évitement étape 1 : tourner à gauche.");
-      turnRight();
-      avoidance_state = 1;
-      avoidance_timer = now + 500; // Durée pour tourner
-      break;
-
-    case 1: // Avancer tout droit (en vérifiant les obstacles)
-      if (now > avoidance_timer) {
-        if (obstacle_distance <= obstacle_seuil) {
-          Serial.println("Obstacle toujours présent. Recommencer l'évitement.");
-          avoidance_state = 0; // Recommencer l'évitement
-        } else {
-          Serial.println("Évitement étape 2 : avancer tout droit.");
-          currentState = MOVING;
-        }
-      }
-      break;
+  else if ((obstacles & LEFT) ^ (obstacles & RIGHT)) {
+    Serial.println("Obstacle on LEFT or RIGHT: Moving FORWARD.");
+    moveForward();
+  }
+  
+  else {
+    Serial.println("No obstacles detected: Moving FORWARD.");
+    moveForward();
   }
 }
+
 
 void obstacleForwardRoutine() {
   unsigned long now = millis();
