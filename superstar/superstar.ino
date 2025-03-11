@@ -131,11 +131,26 @@ void moveRobot() {
   }
 }
 
+/*
+  stopMotors()
+  Description: Stop the motors.
+  Parameters: None
+  Returns: None
+*/
 void stopMotors() {
   motorLeft->run(RELEASE);
   motorRight->run(RELEASE);
 }
 
+/*
+  readUltrasonic(int trigPin, int echoPin)
+  Description: Measures the distance using an ultrasonic sensor.
+  Parameters: 
+    - trigPin (int): The trigger pin of the ultrasonic sensor.
+    - echoPin (int): The echo pin of the ultrasonic sensor.
+  Returns: 
+    - float: The measured distance in centimeters.
+*/
 float readUltrasonic(int trigPin, int echoPin){
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -147,6 +162,12 @@ float readUltrasonic(int trigPin, int echoPin){
   return (duration * .0343) / 2; 
 }
 
+/*
+  updateUltrasonicReadings()
+  Description: Updates the ultrasonic sensor readings at a fixed interval.
+  Parameters: None
+  Returns: None
+*/
 void updateUltrasonicReadings() {
   unsigned long currentTime = millis();
   
