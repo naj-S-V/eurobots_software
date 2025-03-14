@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
+#include "..\utils\utils.h"
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motorLeft = AFMS.getMotor(1);
@@ -55,6 +56,8 @@ State currentState = IDLE;
 //                           Setup
 // ================================================================
 void setup() {  
+  Serial.begin(9600);
+
   pinMode(CPT_LEFT, INPUT);
   pinMode(CPT_RIGHT, INPUT);
   pinMode(CPT_VOID, INPUT);
@@ -73,6 +76,8 @@ void setup() {
 // ================================================================
 void loop() {
   unsigned long elapsedTime = millis() - startTime;
+
+  test();
   
   updateUltrasonicReadings();
   
