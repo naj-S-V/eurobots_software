@@ -1,6 +1,6 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
-#include "..\utils\utils.h"
+#include "utils.h"
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motorLeft = AFMS.getMotor(1);
