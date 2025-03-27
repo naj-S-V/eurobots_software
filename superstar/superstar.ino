@@ -16,6 +16,7 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 #define CPT_US_RIGHT_ECHO_PIN 8
 #define CPT_US_LEFT_TRIG_PIN 13
 #define CPT_US_LEFT_ECHO_PIN 11
+#define RELAY 2
 
 // ================================================================
 //                           Parameters
@@ -44,6 +45,7 @@ bool currentSensor = false;
 // ================================================================
 enum State {
   IDLE,
+  START,
   RUNNING,
   AVOID_OBSTACLE,
   STOPPED
@@ -54,7 +56,9 @@ State currentState = IDLE;
 // ================================================================
 //                           Setup
 // ================================================================
-void setup() {  
+void setup() {
+  Serial.begin(9600);
+
   pinMode(CPT_LEFT, INPUT);
   pinMode(CPT_RIGHT, INPUT);
   pinMode(CPT_VOID, INPUT);
@@ -63,9 +67,10 @@ void setup() {
   pinMode(CPT_US_RIGHT_ECHO_PIN, INPUT);
   pinMode(CPT_US_LEFT_TRIG_PIN, OUTPUT);
   pinMode(CPT_US_LEFT_ECHO_PIN, INPUT);
+
+  pinMode(RELAY, INPUT_PULLUP);
   
   AFMS.begin();
-  startTime = millis();
 }
 
 // ================================================================
@@ -79,6 +84,13 @@ void loop() {
   switch (currentState) {
     
     case IDLE:
+      if(digitalRead(RELAY) == HIGH){
+        startTime = millis();
+        currentState = START;
+      }
+      break;
+      
+    case START:
       if (elapsedTime >= delayStartSec * 1000) {
         currentState = RUNNING;
       }
@@ -131,11 +143,26 @@ void moveRobot() {
   }
 }
 
+/*
+  stopMotors()
+  Description: Stop the motors.
+  Parameters: None
+  Returns: None
+*/
 void stopMotors() {
   motorLeft->run(RELEASE);
   motorRight->run(RELEASE);
 }
 
+/*
+  readUltrasonic(int trigPin, int echoPin)
+  Description: Measures the distance using an ultrasonic sensor.
+  Parameters: 
+    - trigPin (int): The trigger pin of the ultrasonic sensor.
+    - echoPin (int): The echo pin of the ultrasonic sensor.
+  Returns: 
+    - float: The measured distance in centimeters.
+*/
 float readUltrasonic(int trigPin, int echoPin){
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -147,6 +174,12 @@ float readUltrasonic(int trigPin, int echoPin){
   return (duration * .0343) / 2; 
 }
 
+/*
+  updateUltrasonicReadings()
+  Description: Updates the ultrasonic sensor readings at a fixed interval.
+  Parameters: None
+  Returns: None
+*/
 void updateUltrasonicReadings() {
   unsigned long currentTime = millis();
   
@@ -161,5 +194,7 @@ void updateUltrasonicReadings() {
     
     currentSensor = !currentSensor;
   }
-} 
+}
+
+
 
