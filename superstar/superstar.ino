@@ -17,6 +17,7 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 #define CPT_US_RIGHT_ECHO_PIN 8
 #define CPT_US_LEFT_TRIG_PIN 13
 #define CPT_US_LEFT_ECHO_PIN 11
+#define RELAY 2
 
 // ================================================================
 //                           Parameters
@@ -45,6 +46,7 @@ bool currentSensor = false;
 // ================================================================
 enum State {
   IDLE,
+  START,
   RUNNING,
   AVOID_OBSTACLE,
   STOPPED
@@ -55,7 +57,9 @@ State currentState = IDLE;
 // ================================================================
 //                           Setup
 // ================================================================
-void setup() {  
+
+void setup() {
+
   Serial.begin(9600);
 
   pinMode(CPT_LEFT, INPUT);
@@ -66,9 +70,10 @@ void setup() {
   pinMode(CPT_US_RIGHT_ECHO_PIN, INPUT);
   pinMode(CPT_US_LEFT_TRIG_PIN, OUTPUT);
   pinMode(CPT_US_LEFT_ECHO_PIN, INPUT);
+
+  pinMode(RELAY, INPUT_PULLUP);
   
   AFMS.begin();
-  startTime = millis();
 }
 
 // ================================================================
@@ -84,6 +89,13 @@ void loop() {
   switch (currentState) {
     
     case IDLE:
+      if(digitalRead(RELAY) == HIGH){
+        startTime = millis();
+        currentState = START;
+      }
+      break;
+      
+    case START:
       if (elapsedTime >= delayStartSec * 1000) {
         currentState = RUNNING;
       }
@@ -187,5 +199,7 @@ void updateUltrasonicReadings() {
     
     currentSensor = !currentSensor;
   }
-} 
+}
+
+
 
