@@ -1,0 +1,44 @@
+name: Sync utils files across projects
+
+on:
+  push:
+    paths:
+      - "*/utils/utils.h"
+      - "*/utils/utils.cpp"
+
+jobs:
+  sync-utils:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync utils files across all projects
+        run: |
+          # Récupérer la liste des projets (dossiers contenant utils/)
+          PROJECTS=$(find . -type d -name "utils" | sed 's|/utils||')
+
+          # Trouver le projet où les fichiers ont été modifiés
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r ${{ github.event.after }})
+          
+          for FILE in $CHANGED_FILES; do
+            if [[ "$FILE" == */utils/utils.h || "$FILE" == */utils/utils.cpp ]]; then
+              SOURCE_PROJECT=$(echo "$FILE" | cut -d '/' -f1)
+                            
+              for PROJECT in $PROJECTS; do
+                if [[ "$PROJECT" != "$SOURCE_PROJECT" ]]; then
+                  cp "$SOURCE_PROJECT/utils/utils.h" "$PROJECT/utils/utils.h"
+                  cp "$SOURCE_PROJECT/utils/utils.cpp" "$PROJECT/utils/utils.cpp"
+                fi
+              done
+            fi
+          done
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Sync utils.h and utils.cpp across projects" || echo "No changes to commit"
+          git push
