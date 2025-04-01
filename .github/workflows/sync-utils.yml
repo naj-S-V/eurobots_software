@@ -29,7 +29,7 @@ jobs:
         id: detect-modified
         run: |
           # Get modified utils.h and utils.cpp files
-          CHANGED_UTILS_FILES=$(git diff --name-only HEAD^ HEAD -- '**/utils.h' '**/utils.cpp')
+          CHANGED_UTILS_FILES=$(git diff --name-only HEAD~ HEAD -- '**/utils.h' '**/utils.cpp' || git diff --name-only HEAD -- '**/utils.h' '**/utils.cpp')
           
           if [[ -z "$CHANGED_UTILS_FILES" ]]; then
             echo "No modified utils files found. Exiting..."
