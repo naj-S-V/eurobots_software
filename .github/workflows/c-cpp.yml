@@ -1,0 +1,28 @@
+name: Compile Arduino Sketches
+
+on:
+  push:
+    paths:
+      - '**/*.ino'
+  pull_request:
+    paths:
+      - '**/*.ino'
+
+jobs:
+  compile-sketches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile all sketches
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: arduino:avr:uno
+          sketch-paths: |
+            Detection_dobstacle.ino
+            groupie
+            groupie_danse
+            strat_2
+            superstar
+            superstar_test
