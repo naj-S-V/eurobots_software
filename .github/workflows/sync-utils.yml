@@ -14,6 +14,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug Git Commit History
+        run: |
+          echo "📝 Historique des derniers commits :"
+          git log --oneline -n 5
+
+          echo "🔍 Fichiers modifiés entre HEAD^ et HEAD :"
+          git diff --name-only HEAD^ HEAD || echo "⚠️ Erreur lors de git diff"
+
+          echo "🔍 Tous les fichiers du repo :"
+          ls -R
+
       - name: Detect modified utils files
         id: detect-modified
         run: |
