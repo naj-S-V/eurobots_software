@@ -24,3 +24,6 @@ jobs:
             largerobotdisplacement2703
             LargeRobotTasks_Sprint1
             LargeRobotWithObstacleAvoidance
+          libraries: |
+            Servo
+            Wire
