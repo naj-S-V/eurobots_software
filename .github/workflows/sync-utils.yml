@@ -3,8 +3,8 @@ name: Sync utils files across projects
 on:
   push:
     paths:
-      - "*/utils/utils.h"
-      - "*/utils/utils.cpp"
+      - "**/utils.h"
+      - "**/utils.cpp"
 
 jobs:
   sync-utils:
@@ -13,32 +13,77 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
 
-      - name: Sync utils files across all projects
+      - name: Debug Git Commit History
         run: |
-          # Récupérer la liste des projets (dossiers contenant utils/)
-          PROJECTS=$(find . -type d -name "utils" | sed 's|/utils||')
+          echo "📝 Historique des derniers commits :"
+          git log --oneline -n 5
 
-          # Trouver le projet où les fichiers ont été modifiés
-          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r ${{ github.event.after }})
+          echo "🔍 Fichiers modifiés entre HEAD^ et HEAD :"
+          git diff --name-only HEAD^ HEAD || echo "⚠️ Erreur lors de git diff"
+
+          echo "🔍 Tous les fichiers du repo :"
+          ls -R
+
+      - name: Detect modified utils files
+        id: detect-modified
+        run: |
+          # Get modified utils.h and utils.cpp files
+          CHANGED_UTILS_FILES=$(git diff --name-only HEAD~ HEAD -- '**/utils.h' '**/utils.cpp' || git diff --name-only HEAD -- '**/utils.h' '**/utils.cpp')
           
-          for FILE in $CHANGED_FILES; do
-            if [[ "$FILE" == */utils/utils.h || "$FILE" == */utils/utils.cpp ]]; then
-              SOURCE_PROJECT=$(echo "$FILE" | cut -d '/' -f1)
-                            
-              for PROJECT in $PROJECTS; do
-                if [[ "$PROJECT" != "$SOURCE_PROJECT" ]]; then
-                  cp "$SOURCE_PROJECT/utils/utils.h" "$PROJECT/utils/utils.h"
-                  cp "$SOURCE_PROJECT/utils/utils.cpp" "$PROJECT/utils/utils.cpp"
-                fi
-              done
-            fi
-          done
+          if [[ -z "$CHANGED_UTILS_FILES" ]]; then
+            echo "No modified utils files found. Exiting..."
+            exit 0
+          fi
 
-      - name: Commit changes
+          echo "Modified files:"
+          echo "$CHANGED_UTILS_FILES"
+
+          # Check for conflicts (more than one modified file per type)
+          MODIFIED_UTILS_H=$(echo "$CHANGED_UTILS_FILES" | grep "utils.h" | wc -l)
+          MODIFIED_UTILS_CPP=$(echo "$CHANGED_UTILS_FILES" | grep "utils.cpp" | wc -l)
+
+          if [[ "$MODIFIED_UTILS_H" -gt 1 || "$MODIFIED_UTILS_CPP" -gt 1 ]]; then
+            echo "⚠️ Conflict detected! Multiple utils.h or utils.cpp files were modified."
+            exit 1
+          fi
+
+          # Store the latest modified file for synchronization
+          LATEST_MODIFIED_FILE=$(echo "$CHANGED_UTILS_FILES" | tail -n1)
+          echo "LATEST_MODIFIED_FILE=$LATEST_MODIFIED_FILE" >> $GITHUB_ENV
+          
+      - name: Sync utils files across all projects
+        if: success()
+        run: |
+          FILE_TO_SYNC="$LATEST_MODIFIED_FILE"
+          if [[ -z "$FILE_TO_SYNC" ]]; then
+            echo "No file to sync. Exiting..."
+            exit 0
+          fi
+
+          # Extract filename (utils.h or utils.cpp)
+          FILE_NAME=$(basename "$FILE_TO_SYNC")
+
+          echo "Synchronizing $FILE_NAME across all projects..."
+
+          # Find all matching files and update them
+          find . -type f -name "$FILE_NAME" ! -path "$FILE_TO_SYNC" -exec cp "$FILE_TO_SYNC" {} \;
+
+          echo "✅ Synchronization completed."
+
+      - name: Commit and push changes
+        if: success()
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Sync utils.h and utils.cpp across projects" || echo "No changes to commit"
-          git push
+          
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "Sync $FILE_NAME across projects"
+            git push
+            echo "✅ Changes pushed to GitHub."
+          else
+            echo "ℹ️ No changes detected, skipping commit."
+          fi
