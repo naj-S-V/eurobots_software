@@ -4,6 +4,4 @@
 
 void test();
 
-//Modified file
-
 #endif
