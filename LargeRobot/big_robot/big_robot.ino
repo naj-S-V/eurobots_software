@@ -22,21 +22,26 @@
 
 void moveForward();
 void turnLeft();
+void turnRight();
 
 // ================================================================
 //                           Parameters
 // ================================================================
 
-volatile int speed = 65;
+volatile float speed = 80;
+const float offsetRightLeft = 112.5/100;
 
 const int stopAfterSec = 10000;
 const int delayStartSec = 2;
-const float obstacleThreshold = 30.0;
+const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
 const Movement movementSequence[] = {
-  {2000, moveForward},
-  {2000, turnLeft},
+  {1750, moveForward},
+  {500, turnLeft},
+  {1200, moveForward},
+  {666, turnLeft},
+  {1750, moveForward},
 };
 
 
@@ -44,6 +49,9 @@ const Movement movementSequence[] = {
 // ================================================================
 //                           Initialisation
 // ================================================================
+
+const float speedRight = speed;
+const float speedLeft = speed * offsetRightLeft;
 
 int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
 float obstacleRightDistance = 0.0;
@@ -60,7 +68,6 @@ unsigned long timeStartMovement = 0;
 unsigned long timeSpentBeforePause = 0;
 unsigned long pauseStartTime = 0;
 bool isPaused = false;
-bool movementJustStarted = true;
 
 UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
@@ -123,11 +130,20 @@ void loop() {
       } else if (elapsedTime >= maxTime) {
         currentState = STOPPED;
       } else {
+        if (isPaused) {
+          timeStartMovement = millis(); // redémarre le chrono
+          isPaused = false;
+        }
         applyMovementSequence();      
       }
       break;
     
     case AVOID_OBSTACLE:
+      if (!isPaused) {
+        pauseStartTime = millis();  // On note quand la pause commence
+        timeSpentBeforePause += pauseStartTime - timeStartMovement;
+        isPaused = true;
+      }
       stopMotors();      
       currentState = RUNNING;
       break;
@@ -157,10 +173,10 @@ void applyMovementSequence(){
   }
 
   // Si la durée du mouvement est dépassée
-  if (now - timeStartMovement >= current.timeDeplacement) {
+  if ((now - timeStartMovement + timeSpentBeforePause) >= current.timeDeplacement) {
     movementSequenceNumber++;
-    timeStartMovement = now;  // redémarrer le chrono
-    movementJustStarted = true;
+    timeStartMovement = millis();
+    timeSpentBeforePause = 0;
   } else {
     current.movement();
   }
@@ -191,9 +207,9 @@ void avoidObstacleLeft(){
  */
 void moveForward() {
   Serial.println("moveForward");
-  analogWrite(IN1, speed);
+  analogWrite(IN1, speedLeft);
   digitalWrite(IN2, LOW);
-  analogWrite(IN3, speed);
+  analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
 
@@ -290,12 +306,11 @@ void updateUltrasonicReadings() {
  *
  * Active les moteurs pour réaliser une rotation vers la gauche.
  */
-void turnLeft() {
-  Serial.println("turnLeft");
-  analogWrite(IN1, speed);
+void turnRight() {
+  analogWrite(IN1, speedLeft);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
-  analogWrite(IN4, speed);
+  analogWrite(IN4, speedRight);
 }
 
 /**
@@ -303,10 +318,10 @@ void turnLeft() {
  *
  * Active les moteurs de manière à effectuer une rotation vers la droite.
  */
-void turnRight() {
+void turnLeft() {
   digitalWrite(IN1, LOW);
-  analogWrite(IN2, speed);
-  analogWrite(IN3, speed);
+  analogWrite(IN2, speedLeft);
+  analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
 
