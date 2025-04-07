@@ -10,20 +10,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile-sketches:
+  compile-mega:
+    name: Compile sketches for Arduino Mega
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile all sketches
+      - name: Set up Python
+        uses: actions/setup-python@v5
+
+      - name: Find sketches for Arduino Mega
+        id: find-mega
+        run: |
+          echo "sketch_dirs<<EOF" >> $GITHUB_OUTPUT
+          find ./LargeRobot -name '*.ino' -exec dirname {} \; | sort -u >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Compile sketches for Mega
         uses: arduino/compile-sketches@v1
         with:
           fqbn: arduino:avr:mega
-          sketch-paths: |
-            largerobotdisplacement2703
-            LargeRobotTasks_Sprint1
-            LargeRobotWithObstacleAvoidance
+          sketch-paths: ${{ steps.find-mega.outputs.sketch_dirs }}
           libraries: |
             Servo
-            Wire
+            
+  compile-uno:
+    name: Compile sketches for Arduino Uno
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+
+      - name: Find sketches for Arduino Uno
+        id: find-uno
+        run: |
+          echo "sketch_dirs<<EOF" >> $GITHUB_OUTPUT
+          find ./PAMIs -name '*.ino' -exec dirname {} \; | sort -u >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Compile sketches for Uno
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: arduino:avr:uno
+          sketch-paths: ${{ steps.find-uno.outputs.sketch_dirs }}
+          libraries: |
+            Servo
+            "Adafruit Motor Shield V2 Library"
