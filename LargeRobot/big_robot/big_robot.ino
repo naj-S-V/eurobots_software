@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include "utils.h"
 
 // ================================================================
 //                           Connection
@@ -16,32 +17,29 @@
 #define CPT_US_CENTRAL_ECHO_PIN 26
 
 // ================================================================
+//                    Initialisation functions
+// ================================================================
+
+void moveForward();
+void turnLeft();
+
+// ================================================================
 //                           Parameters
 // ================================================================
 
-volatile int speed = 60;
+volatile int speed = 65;
 
 const int stopAfterSec = 10000;
-const int delayStartSec = 5;
+const int delayStartSec = 2;
 const float obstacleThreshold = 30.0;
 const int ultrasonicInterval = 50;
 
-// ================================================================
-//                         Struct and enum
-// ================================================================
-
-/**
- * @brief Structure pour un capteur ultrason.
- *
- * Contient les informations de pin, la distance mesurée et un booléen indiquant si un obstacle est
- * détecté à proximité.
- */
-struct UltrasonicSensor {
-  int trigPin;    ///< Pin de déclenchement
-  int echoPin;    ///< Pin d'écho
-  int distance;   ///< Distance mesurée en cm
-  bool isNear;    ///< Indique si un obstacle est à moins de 15 cm
+const Movement movementSequence[] = {
+  {2000, moveForward},
+  {2000, turnLeft},
 };
+
+
 
 // ================================================================
 //                           Initialisation
@@ -54,6 +52,15 @@ float obstacleCentralDistance = 0.0;
 unsigned long startTime;
 unsigned long lastUltrasonicCheck = 0;
 bool currentSensor = false;
+
+const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
+int movementSequenceNumber = 0;
+
+unsigned long timeStartMovement = 0;
+unsigned long timeSpentBeforePause = 0;
+unsigned long pauseStartTime = 0;
+bool isPaused = false;
+bool movementJustStarted = true;
 
 UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
@@ -101,8 +108,7 @@ void loop() {
   readUltrasonicSensors();
 
   unsigned int sensorDetect = checkUltrasonicSensors();
-  // Serial.println(sensorDetect);
-  
+    
   switch (currentState) {
     
     case IDLE:
@@ -117,12 +123,12 @@ void loop() {
       } else if (elapsedTime >= maxTime) {
         currentState = STOPPED;
       } else {
-        moveForward();      
+        applyMovementSequence();      
       }
       break;
     
     case AVOID_OBSTACLE:
-      avoidObstacle(sensorDetect);
+      stopMotors();      
       currentState = RUNNING;
       break;
     
@@ -135,6 +141,30 @@ void loop() {
 // ================================================================
 //                           Functions
 // ================================================================
+
+void applyMovementSequence(){
+  if (movementSequenceNumber >= movementSequenceCount) {
+    stopMotors();
+    return;
+  }
+
+  unsigned long now = millis();
+  Movement current = movementSequence[movementSequenceNumber];
+
+  // Si on vient de commencer le premier mouvement
+  if (timeStartMovement == 0) {
+    timeStartMovement = millis();
+  }
+
+  // Si la durée du mouvement est dépassée
+  if (now - timeStartMovement >= current.timeDeplacement) {
+    movementSequenceNumber++;
+    timeStartMovement = now;  // redémarrer le chrono
+    movementJustStarted = true;
+  } else {
+    current.movement();
+  }
+}
 
 void avoidObstacle(int sensor){
   if (sensor == 0) { 
@@ -160,6 +190,7 @@ void avoidObstacleLeft(){
  * Active les moteurs pour un mouvement en avant.
  */
 void moveForward() {
+  Serial.println("moveForward");
   analogWrite(IN1, speed);
   digitalWrite(IN2, LOW);
   analogWrite(IN3, speed);
@@ -172,6 +203,7 @@ void moveForward() {
  * Met les pins des moteurs à LOW pour arrêter tout mouvement.
  */
 void stopMotors() {
+  Serial.println("stopMotors");
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
@@ -259,6 +291,7 @@ void updateUltrasonicReadings() {
  * Active les moteurs pour réaliser une rotation vers la gauche.
  */
 void turnLeft() {
+  Serial.println("turnLeft");
   analogWrite(IN1, speed);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
