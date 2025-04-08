@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <Encoder.h>
 #include "utils.h"
 
 // ================================================================
@@ -15,6 +16,10 @@
 #define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
+#define ENC_LEFT_1 3
+#define ENC_LEFT_2 2
+#define ENC_RIGHT_1 19
+#define ENC_RIGHT_2 18
 
 // ================================================================
 //                    Initialisation functions
@@ -36,14 +41,9 @@ const int delayStartSec = 2;
 const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
-const Movement movementSequence[] = {
-  {1750, moveForward},
-  {500, turnLeft},
-  {1200, moveForward},
-  {666, turnLeft},
-  {1750, moveForward},
-};
-
+  const Movement movementSequence[] = {
+    {10, moveForward, false, 0},
+  };
 
 
 // ================================================================
@@ -75,6 +75,11 @@ UltrasonicSensor sensors[] = {
   {CPT_US_CENTRAL_TRIG_PIN, CPT_US_CENTRAL_ECHO_PIN, 100, false},
 };
 int ultrasonicSensorCount = sizeof(sensors) / sizeof(sensors[0]);
+
+Encoder encLeft(ENC_LEFT_1, ENC_LEFT_2);
+Encoder encRight(ENC_RIGHT_1, ENC_RIGHT_2);
+long distanceEncLeft;
+long distanceEncRight;
 
 // ================================================================
 //                           FSM States
@@ -130,20 +135,11 @@ void loop() {
       } else if (elapsedTime >= maxTime) {
         currentState = STOPPED;
       } else {
-        if (isPaused) {
-          timeStartMovement = millis(); // redémarre le chrono
-          isPaused = false;
-        }
         applyMovementSequence();      
       }
       break;
     
     case AVOID_OBSTACLE:
-      if (!isPaused) {
-        pauseStartTime = millis();  // On note quand la pause commence
-        timeSpentBeforePause += pauseStartTime - timeStartMovement;
-        isPaused = true;
-      }
       stopMotors();      
       currentState = RUNNING;
       break;
@@ -164,40 +160,34 @@ void applyMovementSequence(){
     return;
   }
 
-  unsigned long now = millis();
   Movement current = movementSequence[movementSequenceNumber];
+  current.position = averageTickrate();
 
-  // Si on vient de commencer le premier mouvement
-  if (timeStartMovement == 0) {
-    timeStartMovement = millis();
+  Serial.println(current.position);
+
+  if (current.position >= cmToTickrate(current.distance)) {
+    current.isEnd = true;
   }
-
-  // Si la durée du mouvement est dépassée
-  if ((now - timeStartMovement + timeSpentBeforePause) >= current.timeDeplacement) {
+  
+  if (current.isEnd) {
     movementSequenceNumber++;
-    timeStartMovement = millis();
-    timeSpentBeforePause = 0;
+    resetEnc();
   } else {
     current.movement();
   }
 }
 
-void avoidObstacle(int sensor){
-  if (sensor == 0) { 
-    avoidObstacleLeft();
-  } else {
-    avoidObstacleRight();
-  }
+void resetEnc(){
+  encLeft.write(0);
+  encRight.write(0);
 }
 
-void avoidObstacleRight(){
-  turnLeft();
-  delay(500);
+long averageTickrate(){
+  return (encLeft.read() + encRight.read()) / 2;
 }
 
-void avoidObstacleLeft(){
-  turnRight();
-  delay(500);
+long cmToTickrate(long centimeters){ 
+  return centimeters * 200;
 }
 
 /**
