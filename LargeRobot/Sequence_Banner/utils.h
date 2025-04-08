@@ -2,11 +2,14 @@
 #define UTILS_H
 #include <Arduino.h>
 
-void test();
-
+// ================================================================
+//                           Structure
+// ================================================================
 struct Movement{
-  float timeDeplacement;
+  long distance;
   void (*movement)();
+  bool isEnd;
+  long position;
 };
 
 /**
@@ -22,5 +25,8 @@ struct UltrasonicSensor {
   bool isNear;    ///< Indique si un obstacle est à moins de 15 cm
 };
 
-// Test modification
+// ================================================================
+//                           Functions
+// ================================================================
+
 #endif
