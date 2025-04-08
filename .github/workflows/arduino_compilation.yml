@@ -34,6 +34,8 @@ jobs:
           sketch-paths: ${{ steps.find-mega.outputs.sketch_dirs }}
           libraries: |
             Servo
+            "Adafruit GFX Library"
+            "Adafruit SSD1306"
             
   compile-uno:
     name: Compile sketches for Arduino Uno

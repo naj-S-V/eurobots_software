@@ -75,14 +75,19 @@ jobs:
 
       - name: Commit and push changes
         if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
+
+          # Configure remote with authentication token
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+
           if [[ -n "$(git status --porcelain)" ]]; then
             git add .
             git commit -m "Sync $FILE_NAME across projects"
-            git push
+            git push origin HEAD
             echo "✅ Changes pushed to GitHub."
           else
             echo "ℹ️ No changes detected, skipping commit."
