@@ -1,8 +1,8 @@
 #include <Servo.h>
 
-#define PIN_PINCE_FERMETURE 46
+#define PIN_PINCE_FERMETURE 48
 #define PIN_VENTILLO 47
-#define PIN_PINCE_OUVERTURE 48
+#define PIN_PINCE_OUVERTURE 46
 #define PIN_SERVO 49
 
 // Définition des constantes de temps
@@ -39,26 +39,31 @@ void loop() {
     delay(TIME_1);
     digitalWrite(PIN_PINCE_FERMETURE, LOW);
 
-    // Étape 2 : Reculer
-    moveBackward();
-    delay(TIME_2);
-    stopMotors();
+    
+    // Étape 2 : Déplacement du servo
+    myServo.write(120);
+    delay(1000); // Temps pour stabilisation
 
+
+    
     // Étape 3 : Avancer
     moveForward();
     delay(TIME_3);
     stopMotors();
 
-    // Étape 4 : Déplacement du servo
-    myServo.write(120);
-    delay(1000); // Temps pour stabilisation
-
-    // Étape 5 : Activation ventilo
+    // Étape 4 : Activation ventilo
     digitalWrite(PIN_VENTILLO, HIGH);
     delay(TIME_4);
+    
+    // Étape 5 : Reculer
+    moveBackward();
+    delay(TIME_2);
+    stopMotors();
+
+    // Étape 6 : Éteindre ventillo
     digitalWrite(PIN_VENTILLO, LOW);
 
-    // Étape 6 : Ouverture pince
+    // Étape 7 : Ouverture pince
     digitalWrite(PIN_PINCE_OUVERTURE, HIGH);
     delay(TIME_5);
     digitalWrite(PIN_PINCE_OUVERTURE, LOW);
