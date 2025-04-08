@@ -6,11 +6,12 @@
 #define PIN_SERVO 49
 
 // Définition des constantes de temps
-#define TIME_1 1000
-#define TIME_2 2000
-#define TIME_3 3000
+#define TIME_1 2500
+#define TIME_2 4000
+#define TIME_3 1500
 #define TIME_4 4000
 #define TIME_5 5000
+#define TIME_6 200
 
 // Définitions des pins pour les moteurs
 #define IN1 4
@@ -39,12 +40,9 @@ void loop() {
     delay(TIME_1);
     digitalWrite(PIN_PINCE_FERMETURE, LOW);
 
-    
     // Étape 2 : Déplacement du servo
     myServo.write(120);
     delay(1000); // Temps pour stabilisation
-
-
     
     // Étape 3 : Avancer
     moveForward();
@@ -58,6 +56,11 @@ void loop() {
     // Étape 5 : Reculer
     moveBackward();
     delay(TIME_2);
+    stopMotors();
+
+    // Étape intermédiaire : Avancer très légèrement
+    moveForward();
+    delay(TIME_6);
     stopMotors();
 
     // Étape 6 : Éteindre ventillo
