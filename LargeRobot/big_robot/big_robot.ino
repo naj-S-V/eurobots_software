@@ -33,7 +33,7 @@ void turnRight();
 //                           Parameters
 // ================================================================
 
-volatile float speed = 80;
+volatile float speed = 80; //Good value is 80
 const float offsetRightLeft = 112.5/100;
 
 const int stopAfterSec = 10000;
@@ -41,9 +41,16 @@ const int delayStartSec = 2;
 const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
-  const Movement movementSequence[] = {
-    {10, moveForward, false, 0},
-  };
+const Movement movementSequence[] = {
+  {50, moveForward, false, 0},
+  {1000, turnRight, false, 0},
+  {50, moveForward, false, 0},
+  {1000, turnRight, false, 0},
+  {50, moveForward, false, 0},
+  {1000, turnRight, false, 0},
+  {50, moveForward, false, 0},
+  {1000, turnRight, false, 0},
+};
 
 
 // ================================================================
@@ -63,6 +70,7 @@ bool currentSensor = false;
 
 const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
 int movementSequenceNumber = 0;
+Movement currentMovement = movementSequence[movementSequenceNumber];
 
 unsigned long timeStartMovement = 0;
 unsigned long timeSpentBeforePause = 0;
@@ -159,21 +167,15 @@ void applyMovementSequence(){
     stopMotors();
     return;
   }
-
-  Movement current = movementSequence[movementSequenceNumber];
-  current.position = averageTickrate();
-
-  Serial.println(current.position);
-
-  if (current.position >= cmToTickrate(current.distance)) {
-    current.isEnd = true;
-  }
   
-  if (current.isEnd) {
-    movementSequenceNumber++;
+  if (currentMovement.isEnd) {
+    // Serial.println(movementSequenceNumber);
+    currentMovement = movementSequence[++movementSequenceNumber];
+    stopMotors();
+    delay(1500);
     resetEnc();
   } else {
-    current.movement();
+    currentMovement.movement();
   }
 }
 
@@ -196,9 +198,47 @@ long cmToTickrate(long centimeters){
  * Active les moteurs pour un mouvement en avant.
  */
 void moveForward() {
-  Serial.println("moveForward");
+  // Serial.println("moveForward");
+  currentMovement.position = averageTickrate();
+
+  if (currentMovement.position >= cmToTickrate(currentMovement.distance)) {
+    currentMovement.isEnd = true;
+    return;
+  }
   analogWrite(IN1, speedLeft);
   digitalWrite(IN2, LOW);
+  analogWrite(IN3, speedRight);
+  digitalWrite(IN4, LOW);
+}
+
+/**
+ * @brief Fait tourner le robot vers la gauche.
+ *
+ * Active les moteurs pour réaliser une rotation vers la gauche.
+ */
+void turnRight() {
+  int tirckrateTurn = 5250;
+  if(encLeft.read() <= tirckrateTurn){
+    analogWrite(IN1, speedLeft);
+    digitalWrite(IN2, LOW);
+  }
+  if(encRight.read() >= -tirckrateTurn) {
+    digitalWrite(IN3, LOW);
+    analogWrite(IN4, speedRight);
+  }
+  if(encLeft.read() >= tirckrateTurn && encRight.read() <= -tirckrateTurn) {
+    currentMovement.isEnd = true;
+  }
+}
+
+/**
+ * @brief Fait tourner le robot vers la droite.
+ *
+ * Active les moteurs de manière à effectuer une rotation vers la droite.
+ */
+void turnLeft() {
+  digitalWrite(IN1, LOW);
+  analogWrite(IN2, speedLeft);
   analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
@@ -289,29 +329,5 @@ void updateUltrasonicReadings() {
     
     currentSensor = !currentSensor;
   }
-}
-
-/**
- * @brief Fait tourner le robot vers la gauche.
- *
- * Active les moteurs pour réaliser une rotation vers la gauche.
- */
-void turnRight() {
-  analogWrite(IN1, speedLeft);
-  digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);
-  analogWrite(IN4, speedRight);
-}
-
-/**
- * @brief Fait tourner le robot vers la droite.
- *
- * Active les moteurs de manière à effectuer une rotation vers la droite.
- */
-void turnLeft() {
-  digitalWrite(IN1, LOW);
-  analogWrite(IN2, speedLeft);
-  analogWrite(IN3, speedRight);
-  digitalWrite(IN4, LOW);
 }
 
