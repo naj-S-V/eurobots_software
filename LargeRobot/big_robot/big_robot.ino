@@ -27,29 +27,32 @@
 
 void moveForward();
 void turnLeft();
-void turnRight();
+void turnRight180();
+void turnLeft180();
+void turnRight90();
+void turnLeft90();
 
 // ================================================================
 //                           Parameters
 // ================================================================
 
 volatile float speed = 80; //Good value is 80
-const float offsetRightLeft = 112.5/100;
+const float offsetRightLeft = 112.5/100; // 112.5/100
 
+bool sensorOff = true;
 const int stopAfterSec = 10000;
 const int delayStartSec = 2;
 const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
+float tickrateByDegre = 29.722;
+
 const Movement movementSequence[] = {
-  {50, moveForward, false, 0},
-  {1000, turnRight, false, 0},
-  {50, moveForward, false, 0},
-  {1000, turnRight, false, 0},
-  {50, moveForward, false, 0},
-  {1000, turnRight, false, 0},
-  {50, moveForward, false, 0},
-  {1000, turnRight, false, 0},
+  {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {60, moveForward, false, 0},
 };
 
 
@@ -138,7 +141,7 @@ void loop() {
       break;
     
     case RUNNING:
-      if (sensorDetect != 1000) {
+      if (sensorDetect != 1000 && !sensorOff) {
         currentState = AVOID_OBSTACLE;
       } else if (elapsedTime >= maxTime) {
         currentState = STOPPED;
@@ -216,19 +219,64 @@ void moveForward() {
  *
  * Active les moteurs pour réaliser une rotation vers la gauche.
  */
-void turnRight() {
-  int tirckrateTurn = 5250;
-  if(encLeft.read() <= tirckrateTurn){
+void turnRight180() {
+  float tirckrateTurn =  5500;
+  long tickrateLeft = encLeft.read();
+  long tickrateRight = abs(encRight.read());
+  if(tickrateLeft <= tirckrateTurn){
     analogWrite(IN1, speedLeft);
     digitalWrite(IN2, LOW);
   }
-  if(encRight.read() >= -tirckrateTurn) {
+  if(tickrateRight <= tirckrateTurn) {
     digitalWrite(IN3, LOW);
     analogWrite(IN4, speedRight);
   }
-  if(encLeft.read() >= tirckrateTurn && encRight.read() <= -tirckrateTurn) {
-    currentMovement.isEnd = true;
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnLeft180() {
+  float tirckrateTurn =  5500;
+  long tickrateLeft = abs(encLeft.read());
+  long tickrateRight = encRight.read();
+  if(tickrateLeft <= tirckrateTurn){
+    digitalWrite(IN1, LOW);
+    analogWrite(IN2, speedLeft);
   }
+  if(tickrateRight <= tirckrateTurn) {
+    analogWrite(IN3, speedRight); 
+    digitalWrite(IN4, LOW);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnRight90() {
+  float tirckrateTurn =  2400;
+  long tickrateLeft = encLeft.read();
+  long tickrateRight = abs(encRight.read());
+  if(tickrateLeft <= tirckrateTurn){
+    analogWrite(IN1, speedLeft);
+    digitalWrite(IN2, LOW);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    digitalWrite(IN3, LOW);
+    analogWrite(IN4, speedRight);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnLeft90() {
+  float tirckrateTurn =  2400;
+  long tickrateLeft = abs(encLeft.read());
+  long tickrateRight = encRight.read();
+  if(tickrateLeft <= tirckrateTurn){
+    digitalWrite(IN1, LOW);
+    analogWrite(IN2, speedLeft);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    analogWrite(IN3, speedRight); 
+    digitalWrite(IN4, LOW);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
 }
 
 /**
