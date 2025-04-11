@@ -32,6 +32,10 @@ void turnLeft180();
 void turnRight90();
 void turnLeft90();
 
+void deactivateUSSensor();
+void activateUSSensor();
+
+
 // ================================================================
 //                           Parameters
 // ================================================================
@@ -39,7 +43,6 @@ void turnLeft90();
 volatile float speed = 80; //Good value is 80
 const float offsetRightLeft = 112.5/100; // 112.5/100
 
-bool sensorOff = true;
 const int stopAfterSec = 10000;
 const int delayStartSec = 2;
 const float obstacleThreshold = 15.0;
@@ -52,6 +55,7 @@ const Movement movementSequence[] = {
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
   {60, moveForward, false, 0},
 };
 
@@ -63,6 +67,7 @@ const Movement movementSequence[] = {
 const float speedRight = speed;
 const float speedLeft = speed * offsetRightLeft;
 
+bool sensorOff = false;
 int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
 float obstacleRightDistance = 0.0;
 float obstacleLeftDistance = 0.0;
@@ -74,11 +79,6 @@ bool currentSensor = false;
 const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
 int movementSequenceNumber = 0;
 Movement currentMovement = movementSequence[movementSequenceNumber];
-
-unsigned long timeStartMovement = 0;
-unsigned long timeSpentBeforePause = 0;
-unsigned long pauseStartTime = 0;
-bool isPaused = false;
 
 UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
@@ -181,6 +181,17 @@ void applyMovementSequence(){
     currentMovement.movement();
   }
 }
+
+void deactivateUSSensor(){
+  sensorOff = true;
+  currentMovement.isEnd = true;
+}
+
+void activateUSSensor(){
+  sensorOff = false;
+  currentMovement.isEnd = true;
+}
+
 
 void resetEnc(){
   encLeft.write(0);
