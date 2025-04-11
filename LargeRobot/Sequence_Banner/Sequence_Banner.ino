@@ -29,7 +29,6 @@ void setup() {
     pinMode(PIN_VENTILLO, OUTPUT);
     pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
     myServo.attach(PIN_SERVO);
-    myServo.write(0);
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
     pinMode(IN3, OUTPUT);
@@ -37,6 +36,8 @@ void setup() {
 }
 
 void loop() {
+    myServo.write(30);
+    
     // Étape 1 : Activation fermeture pince
     digitalWrite(PIN_PINCE_FERMETURE, HIGH);
     delay(TIME_1);
