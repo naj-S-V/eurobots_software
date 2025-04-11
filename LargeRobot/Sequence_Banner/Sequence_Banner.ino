@@ -4,6 +4,7 @@
 #define PIN_VENTILLO 47
 #define PIN_PINCE_OUVERTURE 46
 #define PIN_SERVO 49
+#define PIN_EJECTEUR 45
 
 // Définition des constantes de temps
 #define TIME_1 2500
@@ -12,6 +13,7 @@
 #define TIME_4 4000
 #define TIME_5 5000
 #define TIME_6 200
+#define TIME_7 1000
 
 // Définitions des pins pour les moteurs
 #define IN1 4
@@ -71,6 +73,11 @@ void loop() {
     delay(TIME_5);
     digitalWrite(PIN_PINCE_OUVERTURE, LOW);
 
+    // Étape 8 : Activer éjecteur
+    digitalWrite(PIN_EJECTEUR, HIGH);
+    delay(TIME_7); // Temps pour éjecter
+    digitalWrite(PIN_EJECTEUR, LOW);
+    
     // Fin de la séquence (ne pas répéter)
     while (true);
 }
