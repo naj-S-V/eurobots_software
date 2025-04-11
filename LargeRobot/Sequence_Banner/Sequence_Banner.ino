@@ -28,6 +28,7 @@ void setup() {
     pinMode(PIN_PINCE_FERMETURE, OUTPUT);
     pinMode(PIN_VENTILLO, OUTPUT);
     pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+    pinMode(PIN_EJECTEUR, OUTPUT);
     myServo.attach(PIN_SERVO);
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
