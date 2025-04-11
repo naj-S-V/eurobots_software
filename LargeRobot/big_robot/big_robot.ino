@@ -20,6 +20,7 @@
 #define ENC_LEFT_2 2
 #define ENC_RIGHT_1 19
 #define ENC_RIGHT_2 18
+#define RELAY 50
 
 // ================================================================
 //                    Initialisation functions
@@ -97,6 +98,7 @@ long distanceEncRight;
 // ================================================================
 enum State {
   IDLE,
+  START,
   RUNNING,
   AVOID_OBSTACLE,
   STOPPED
@@ -110,6 +112,8 @@ State currentState = IDLE;
 
 void setup() {
   Serial.begin(9600);
+
+  pinMode(RELAY, INPUT_PULLUP);
 
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -135,6 +139,14 @@ void loop() {
   switch (currentState) {
     
     case IDLE:
+      if(digitalRead(RELAY) == HIGH){
+        Serial.println("tirette");
+        startTime = millis();
+        currentState = START;
+      }
+      break;
+      
+    case START:
       if (elapsedTime >= delayStartSec * 1000) {
         currentState = RUNNING;
       }
