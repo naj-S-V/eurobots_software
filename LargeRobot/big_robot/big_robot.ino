@@ -1,3 +1,4 @@
+#include <SPI.h>
 #include <Wire.h>
 #include <Encoder.h>
 #include "utils.h"
@@ -6,14 +7,12 @@
 //                           Connection
 // ================================================================
 
+#define OLED_RESET 1
 #define IN1 4 
 #define IN2 5 
 #define IN3 6
 #define IN4 8
-#define CPT_US_RIGHT_TRIG_PIN 35
-#define CPT_US_RIGHT_ECHO_PIN 34
-#define CPT_US_LEFT_TRIG_PIN 31
-#define CPT_US_LEFT_ECHO_PIN 30
+#define CPT_US_CENTRAL_ECHO_PIN 26
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
 #define ENC_LEFT_1 3
@@ -124,14 +123,18 @@ void setup() {
     pinMode(sensors[i].trigPin, OUTPUT);
     pinMode(sensors[i].echoPin, INPUT);
   }
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
 }
 
 // ================================================================
 //                           Loop (FSM Logic)
 // ================================================================
 void loop() {
-  unsigned long elapsedTime = millis() - startTime;
-    
+  unsigned long elapsedTime = (millis() - startTime)/100; // Temps écoulé en DIXIEMES de secondes
+  updateScore(elapsedTime);
   readUltrasonicSensors();
 
   unsigned int sensorDetect = checkUltrasonicSensors();
@@ -155,7 +158,7 @@ void loop() {
     case RUNNING:
       if (sensorDetect != 1000 && !sensorOff) {
         currentState = AVOID_OBSTACLE;
-      } else if (elapsedTime >= maxTime) {
+      } else if (elapsedTime >= (maxTime/100)) {
         currentState = STOPPED;
       } else {
         applyMovementSequence();      
@@ -326,6 +329,47 @@ void stopMotors() {
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
 }
+
+/**
+ * @brief Met à jour l'affichage du score en fonction du temps écoulé.
+ *
+ * Détermine un score à afficher selon la valeur du temps donné.
+ * Affiche un smiley ASCII différent selon la parité de `time`, 
+ * puis affiche le score correspondant sur l'écran OLED.
+ * Le score est affiché en grand au centre de l'écran.
+ *
+ * @param time Le temps écoulé en dixièmes de secondes, utilisé pour déterminer le score.
+ */
+void updateScore(int time) {
+  int score;
+  const char* smiley;
+  if (time > 20) {
+    score = 45;
+  } else if (time > 14) {
+    score = 35;
+  } else if (time > 4) {
+    score = 20;
+  } else {
+    score = 0;
+  }
+
+  if ((time/8)%2) {
+    smiley = "(>'-')> SCORE <('-'<)";
+  } else {
+    smiley = "<('-'<) SCORE (>'-')>";
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+  display.println(smiley);
+  display.setTextSize(2);
+  display.setCursor(50,15);
+  display.println(score);
+  display.display();
+}
+
 
 /*
   readUltrasonic(int trigPin, int echoPin)
