@@ -1,4 +1,6 @@
 #include <Wire.h>
+#include <Encoder.h>
+#include "utils.h"
 
 // ================================================================
 //                           Connection
@@ -14,39 +16,59 @@
 #define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
+#define ENC_LEFT_1 3
+#define ENC_LEFT_2 2
+#define ENC_RIGHT_1 19
+#define ENC_RIGHT_2 18
+#define RELAY 50
+
+// ================================================================
+//                    Initialisation functions
+// ================================================================
+
+void moveForward();
+void turnLeft();
+void turnRight180();
+void turnLeft180();
+void turnRight90();
+void turnLeft90();
+
+void deactivateUSSensor();
+void activateUSSensor();
+
 
 // ================================================================
 //                           Parameters
 // ================================================================
 
-volatile int speed = 60;
+volatile float speed = 80; //Good value is 80
+const float offsetRightLeft = 112.5/100; // 112.5/100
 
 const int stopAfterSec = 10000;
-const int delayStartSec = 5;
-const float obstacleThreshold = 30.0;
+const int delayStartSec = 2;
+const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
-// ================================================================
-//                         Struct and enum
-// ================================================================
+float tickrateByDegre = 29.722;
 
-/**
- * @brief Structure pour un capteur ultrason.
- *
- * Contient les informations de pin, la distance mesurée et un booléen indiquant si un obstacle est
- * détecté à proximité.
- */
-struct UltrasonicSensor {
-  int trigPin;    ///< Pin de déclenchement
-  int echoPin;    ///< Pin d'écho
-  int distance;   ///< Distance mesurée en cm
-  bool isNear;    ///< Indique si un obstacle est à moins de 15 cm
+const Movement movementSequence[] = {
+  {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
+  {60, moveForward, false, 0},
 };
+
 
 // ================================================================
 //                           Initialisation
 // ================================================================
 
+const float speedRight = speed;
+const float speedLeft = speed * offsetRightLeft;
+
+bool sensorOff = false;
 int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
 float obstacleRightDistance = 0.0;
 float obstacleLeftDistance = 0.0;
@@ -55,6 +77,10 @@ unsigned long startTime;
 unsigned long lastUltrasonicCheck = 0;
 bool currentSensor = false;
 
+const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
+int movementSequenceNumber = 0;
+Movement currentMovement = movementSequence[movementSequenceNumber];
+
 UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
   {CPT_US_LEFT_TRIG_PIN, CPT_US_LEFT_ECHO_PIN, 100, false},
@@ -62,11 +88,17 @@ UltrasonicSensor sensors[] = {
 };
 int ultrasonicSensorCount = sizeof(sensors) / sizeof(sensors[0]);
 
+Encoder encLeft(ENC_LEFT_1, ENC_LEFT_2);
+Encoder encRight(ENC_RIGHT_1, ENC_RIGHT_2);
+long distanceEncLeft;
+long distanceEncRight;
+
 // ================================================================
 //                           FSM States
 // ================================================================
 enum State {
   IDLE,
+  START,
   RUNNING,
   AVOID_OBSTACLE,
   STOPPED
@@ -80,6 +112,8 @@ State currentState = IDLE;
 
 void setup() {
   Serial.begin(9600);
+
+  pinMode(RELAY, INPUT_PULLUP);
 
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -101,28 +135,35 @@ void loop() {
   readUltrasonicSensors();
 
   unsigned int sensorDetect = checkUltrasonicSensors();
-  // Serial.println(sensorDetect);
-  
+    
   switch (currentState) {
     
     case IDLE:
+      if(digitalRead(RELAY) == HIGH){
+        Serial.println("tirette");
+        startTime = millis();
+        currentState = START;
+      }
+      break;
+      
+    case START:
       if (elapsedTime >= delayStartSec * 1000) {
         currentState = RUNNING;
       }
       break;
     
     case RUNNING:
-      if (sensorDetect != 1000) {
+      if (sensorDetect != 1000 && !sensorOff) {
         currentState = AVOID_OBSTACLE;
       } else if (elapsedTime >= maxTime) {
         currentState = STOPPED;
       } else {
-        moveForward();      
+        applyMovementSequence();      
       }
       break;
     
     case AVOID_OBSTACLE:
-      avoidObstacle(sensorDetect);
+      stopMotors();      
       currentState = RUNNING;
       break;
     
@@ -136,22 +177,45 @@ void loop() {
 //                           Functions
 // ================================================================
 
-void avoidObstacle(int sensor){
-  if (sensor == 0) { 
-    avoidObstacleLeft();
+void applyMovementSequence(){
+  if (movementSequenceNumber >= movementSequenceCount) {
+    stopMotors();
+    return;
+  }
+  
+  if (currentMovement.isEnd) {
+    // Serial.println(movementSequenceNumber);
+    currentMovement = movementSequence[++movementSequenceNumber];
+    stopMotors();
+    delay(1500);
+    resetEnc();
   } else {
-    avoidObstacleRight();
+    currentMovement.movement();
   }
 }
 
-void avoidObstacleRight(){
-  turnLeft();
-  delay(500);
+void deactivateUSSensor(){
+  sensorOff = true;
+  currentMovement.isEnd = true;
 }
 
-void avoidObstacleLeft(){
-  turnRight();
-  delay(500);
+void activateUSSensor(){
+  sensorOff = false;
+  currentMovement.isEnd = true;
+}
+
+
+void resetEnc(){
+  encLeft.write(0);
+  encRight.write(0);
+}
+
+long averageTickrate(){
+  return (encLeft.read() + encRight.read()) / 2;
+}
+
+long cmToTickrate(long centimeters){ 
+  return centimeters * 200;
 }
 
 /**
@@ -160,9 +224,93 @@ void avoidObstacleLeft(){
  * Active les moteurs pour un mouvement en avant.
  */
 void moveForward() {
-  analogWrite(IN1, speed);
+  // Serial.println("moveForward");
+  currentMovement.position = averageTickrate();
+
+  if (currentMovement.position >= cmToTickrate(currentMovement.distance)) {
+    currentMovement.isEnd = true;
+    return;
+  }
+  analogWrite(IN1, speedLeft);
   digitalWrite(IN2, LOW);
-  analogWrite(IN3, speed);
+  analogWrite(IN3, speedRight);
+  digitalWrite(IN4, LOW);
+}
+
+/**
+ * @brief Fait tourner le robot vers la gauche.
+ *
+ * Active les moteurs pour réaliser une rotation vers la gauche.
+ */
+void turnRight180() {
+  float tirckrateTurn =  5500;
+  long tickrateLeft = encLeft.read();
+  long tickrateRight = abs(encRight.read());
+  if(tickrateLeft <= tirckrateTurn){
+    analogWrite(IN1, speedLeft);
+    digitalWrite(IN2, LOW);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    digitalWrite(IN3, LOW);
+    analogWrite(IN4, speedRight);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnLeft180() {
+  float tirckrateTurn =  5500;
+  long tickrateLeft = abs(encLeft.read());
+  long tickrateRight = encRight.read();
+  if(tickrateLeft <= tirckrateTurn){
+    digitalWrite(IN1, LOW);
+    analogWrite(IN2, speedLeft);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    analogWrite(IN3, speedRight); 
+    digitalWrite(IN4, LOW);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnRight90() {
+  float tirckrateTurn =  2400;
+  long tickrateLeft = encLeft.read();
+  long tickrateRight = abs(encRight.read());
+  if(tickrateLeft <= tirckrateTurn){
+    analogWrite(IN1, speedLeft);
+    digitalWrite(IN2, LOW);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    digitalWrite(IN3, LOW);
+    analogWrite(IN4, speedRight);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+void turnLeft90() {
+  float tirckrateTurn =  2400;
+  long tickrateLeft = abs(encLeft.read());
+  long tickrateRight = encRight.read();
+  if(tickrateLeft <= tirckrateTurn){
+    digitalWrite(IN1, LOW);
+    analogWrite(IN2, speedLeft);
+  }
+  if(tickrateRight <= tirckrateTurn) {
+    analogWrite(IN3, speedRight); 
+    digitalWrite(IN4, LOW);
+  }
+  currentMovement.isEnd = (tickrateLeft >= tirckrateTurn && tickrateRight >= tirckrateTurn);
+}
+
+/**
+ * @brief Fait tourner le robot vers la droite.
+ *
+ * Active les moteurs de manière à effectuer une rotation vers la droite.
+ */
+void turnLeft() {
+  digitalWrite(IN1, LOW);
+  analogWrite(IN2, speedLeft);
+  analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
 
@@ -172,6 +320,7 @@ void moveForward() {
  * Met les pins des moteurs à LOW pour arrêter tout mouvement.
  */
 void stopMotors() {
+  Serial.println("stopMotors");
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
@@ -251,29 +400,5 @@ void updateUltrasonicReadings() {
     
     currentSensor = !currentSensor;
   }
-}
-
-/**
- * @brief Fait tourner le robot vers la gauche.
- *
- * Active les moteurs pour réaliser une rotation vers la gauche.
- */
-void turnLeft() {
-  analogWrite(IN1, speed);
-  digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);
-  analogWrite(IN4, speed);
-}
-
-/**
- * @brief Fait tourner le robot vers la droite.
- *
- * Active les moteurs de manière à effectuer une rotation vers la droite.
- */
-void turnRight() {
-  digitalWrite(IN1, LOW);
-  analogWrite(IN2, speed);
-  analogWrite(IN3, speed);
-  digitalWrite(IN4, LOW);
 }
 
