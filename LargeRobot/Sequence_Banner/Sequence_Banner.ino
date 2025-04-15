@@ -4,16 +4,17 @@
 #define PIN_VENTILLO 47
 #define PIN_PINCE_OUVERTURE 46
 #define PIN_SERVO 49
-#define PIN_EJECTEUR 45
+#define PIN_EJECTEUR 50
+#define PIN_EJECTEUR_RETRACTION 51
 
 // Définition des constantes de temps
-#define TIME_1 2500
+#define TIME_1 3000
 #define TIME_2 4000
 #define TIME_3 1500
 #define TIME_4 4000
-#define TIME_5 5000
-#define TIME_6 200
-#define TIME_7 1000
+#define TIME_5 4000
+#define TIME_6 1000
+#define TIME_7 3000
 
 // Définitions des pins pour les moteurs
 #define IN1 4
@@ -29,6 +30,7 @@ void setup() {
     pinMode(PIN_VENTILLO, OUTPUT);
     pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
     pinMode(PIN_EJECTEUR, OUTPUT);
+    pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
     myServo.attach(PIN_SERVO);
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
@@ -37,7 +39,7 @@ void setup() {
 }
 
 void loop() {
-    myServo.write(30);
+    myServo.write(10);
     
     // Étape 1 : Activation fermeture pince
     digitalWrite(PIN_PINCE_FERMETURE, HIGH);
@@ -79,6 +81,16 @@ void loop() {
     digitalWrite(PIN_EJECTEUR, HIGH);
     delay(TIME_7); // Temps pour éjecter
     digitalWrite(PIN_EJECTEUR, LOW);
+
+    // RESET SECTION
+
+    myServo.write(10);
+    digitalWrite(PIN_EJECTEUR_RETRACTION, HIGH);
+    delay(TIME_7); // Temps pour éjecter
+    digitalWrite(PIN_EJECTEUR_RETRACTION, LOW);
+    
+    
+
     
     // Fin de la séquence (ne pas répéter)
     while (true);
