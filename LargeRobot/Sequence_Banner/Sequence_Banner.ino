@@ -14,7 +14,7 @@
 #define TIME_4 4000
 #define TIME_5 4000
 #define TIME_6 1000
-#define TIME_7 3000
+#define TIME_7 2200
 
 // Définitions des pins pour les moteurs
 #define IN1 4
@@ -40,6 +40,9 @@ void setup() {
 
 void loop() {
     myServo.write(10);
+    digitalWrite(PIN_EJECTEUR_RETRACTION, HIGH);
+    delay(TIME_7); // Temps pour éjecter
+    digitalWrite(PIN_EJECTEUR_RETRACTION, LOW);
     
     // Étape 1 : Activation fermeture pince
     digitalWrite(PIN_PINCE_FERMETURE, HIGH);
@@ -97,7 +100,7 @@ void loop() {
 }
 
 void moveForward() {
-    analogWrite(IN1, MOTOR_SPEED);
+    analogWrite(IN1, MOTOR_SPEED*1.12);
     digitalWrite(IN2, LOW);
     analogWrite(IN3, MOTOR_SPEED);
     digitalWrite(IN4, LOW);
@@ -105,7 +108,7 @@ void moveForward() {
 
 void moveBackward() {
     digitalWrite(IN1, LOW);
-    analogWrite(IN2, MOTOR_SPEED);
+    analogWrite(IN2, MOTOR_SPEED*1.12);
     digitalWrite(IN3, LOW);
     analogWrite(IN4, MOTOR_SPEED);
 }
