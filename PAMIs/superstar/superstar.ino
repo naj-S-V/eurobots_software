@@ -26,7 +26,7 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 volatile int speed = 65;
 
 const int stopAfterSec = 15;
-const int delayStartSec = 5;
+const unsigned long delayStartSec = 85;
 const float obstacleThreshold = 10.0;
 const int ultrasonicInterval = 50;
 
@@ -34,7 +34,7 @@ const int ultrasonicInterval = 50;
 //                           Initialisation
 // ================================================================
 
-int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
+unsigned long maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
 float obstacleRightDistance = 0.0;
 float obstacleLeftDistance = 0.0;
 unsigned long startTime;
@@ -81,8 +81,6 @@ void setup() {
 // ================================================================
 void loop() {
   unsigned long elapsedTime = millis() - startTime;
-
-  test();
   
   updateUltrasonicReadings();
   
