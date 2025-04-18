@@ -92,7 +92,7 @@ float tickrateByDegre = 29.722;
 
 // For delaying score update
 const unsigned long interval = 500;
-const unsigned long lastUpdateTime = 0;
+unsigned long lastUpdateTime = 0;
 
 // ================================================================
 //                       Movements sequences
