@@ -36,8 +36,8 @@
 #define RELAY 24 //TODO: changer la pin de la tirette.
 
 //Switches
-#define SWITCH_MSB 51
-#define SWITCH_LSB 52
+#define SWITCH_MSB 52
+#define SWITCH_LSB 53
 
 //Banner Routine Pin Definitions
 #define PIN_PINCE_FERMETURE 48
@@ -219,6 +219,8 @@ void loop() {
   updateScore(elapsedTime);
   readUltrasonicSensors();
 
+  selectSequences();
+
   unsigned int sensorDetect = checkUltrasonicSensors();
     
   switch (currentState) {
@@ -227,7 +229,7 @@ void loop() {
       if(digitalRead(RELAY) == HIGH){
         // Serial.println("IDLE");
         startTime = millis();
-        currentState = START;
+        // currentState = START;
       }
       break;
       
@@ -549,5 +551,27 @@ void dropBanner() {
   currentMovement.isEnd = true;
 }
 
-void switchSequences
+void selectSequences(){
+  int valeur = 0;
+  if (digitalRead(SWITCH_MSB) == 1) {
+    valeur += 2;
+  }
+  if (digitalRead(SWITCH_LSB) == 1) {
+    valeur += 1;
+  }
 
+  switch(valeur){
+    case 0: 
+      Serial.println(0);
+      break;
+    case 1: 
+      Serial.println(1);
+      break;
+    case 2: 
+      Serial.println(2);
+      break;
+    case 3: 
+      Serial.println(3);
+      break;
+  }
+}
