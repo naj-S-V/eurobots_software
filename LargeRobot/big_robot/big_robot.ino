@@ -99,18 +99,6 @@ const unsigned long blockTimeout = 2000;
 //                       Movements sequences
 // ================================================================
 
-// Movement movementSequence[] = {
-//   {40, moveForward, false, 0},
-//   {1000, turnRight90, false, 0},
-//   {40, moveForward, false, 0},
-//   {1000, turnLeft90, false, 0},
-//   {1000, deactivateUSSensor, false, 0},
-//   {1000, checkEncoderOn, false, 0},
-//   {100 ,moveBackward, false, 0},
-//   {1000, checkEncoderOff, false, 0},
-//   {40, moveForward, false, 0},
-// };
-
 Movement movementSequence[] = {
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
@@ -128,12 +116,22 @@ Movement movementSequence[] = {
   {70, moveBackward, false, 0},
 };
 
-// Movement movementSequence[] = {
-//   {1000, checkEncoderOn, false, 0},
-//   {60, moveBackward, false, 0},
-//   {1000, checkEncoderOff, false, 0},
-//   {40, moveForward, false, 0},
-// };
+Movement movementSequence1[] = {
+  // {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {40, moveForward, false, 0},
+  {1000, turnLeft90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {30, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {70, moveBackward, false, 0},
+};
 
 // Movement movementSequence1[] = {
 //   {1000, deactivateUSSensor, false, 0},
@@ -150,9 +148,11 @@ Movement movementSequence[] = {
 //   {60, moveForward, false, 0}
 // };
 
-const int movementSequenceCount  = sizeof(movementSequence) / sizeof(movementSequence[0]);
-int movementSequenceNumber  = 0;
-Movement currentMovement = movementSequence[movementSequenceNumber];
+const Movement* choosedSequence = nullptr;
+
+int choosedSequenceCount  = sizeof(choosedSequence) / sizeof(Movement);
+int choosedSequenceNumber  = 0;
+Movement currentMovement;
 
 // ================================================================
 //                           Initialisation
@@ -218,6 +218,8 @@ void setup() {
 
   pinMode(SWITCH_MSB, INPUT);
   pinMode(SWITCH_LSB, INPUT);
+  selectSequence();
+  currentMovement = choosedSequence[choosedSequenceNumber];
 
   // Motor pins
   pinMode(IN1, OUTPUT);
@@ -256,12 +258,12 @@ void setup() {
 //                           Loop (FSM Logic)
 // ================================================================
 void loop() {
-  unsigned long elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
+  unsigned long elapsedTime = millis() - startTime;
   // updateScore(elapsedTime);
   readUltrasonicSensors();
   isRobotBlocked();
 
-  // selectSequences();
+  // Serial.println(getMovementName(currentMovement.movement));
 
   unsigned int sensorDetect = checkUltrasonicSensors();
     
@@ -308,13 +310,13 @@ void loop() {
 // ================================================================
 
 void applyMovementSequence(){
-  if (movementSequenceNumber  >= movementSequenceCount ) {
+  if (choosedSequenceNumber  >= choosedSequenceCount ) {
     stopMotors();
     return;
   }
   
   if (currentMovement.isEnd) {
-    currentMovement = movementSequence[++movementSequenceNumber ];
+    currentMovement = choosedSequence[++choosedSequenceNumber];
     stopMotors();
     delay(1000);
     resetEnc();
@@ -646,7 +648,7 @@ void dropBanner() {
   currentMovement.isEnd = true;
 }
 
-int selectSequences(){
+void selectSequence(){
   int valeur = 0;
   if (digitalRead(SWITCH_MSB) == 1) {
     valeur += 2;
@@ -657,10 +659,14 @@ int selectSequences(){
 
   switch(valeur){
     case 0: 
-      // movementSequence = movementSequence;
+      Serial.println(0);
+      choosedSequence = movementSequence;
+      // memcpy(choosedSequence, movementSequence, choosedSequenceCount * sizeof(movementSequence[0]));
       break;
     case 1: 
       Serial.println(1);
+      choosedSequence = movementSequence1;
+      // memcpy(choosedSequence, movementSequence1, choosedSequenceCount * sizeof(movementSequence1[0]));
       break;
     case 2: 
       Serial.println(2);
@@ -670,3 +676,17 @@ int selectSequences(){
       break;
   }
 }
+
+const char* getMovementName(void (*movement)()) {
+  if (movement == moveForward) return "moveForward";
+  if (movement == moveBackward) return "moveBackward";
+  if (movement == turnLeft90) return "turnLeft90";
+  if (movement == turnRight90) return "turnRight90";
+  if (movement == turnLeft180) return "turnLeft180";
+  if (movement == turnRight180) return "turnRight180";
+  if (movement == activateUSSensor) return "activateUSSensor";
+  if (movement == deactivateUSSensor) return "deactivateUSSensor";
+  if (movement == deployBanner) return "deployBanner";
+  if (movement == dropBanner) return "dropBanner";
+  return "Unknown";
+} 
