@@ -1,32 +1,55 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Encoder.h>
+#include <Servo.h>
 #include "utils.h"
+#include <Adafruit_SSD1306.h>   // Assumed display library
 
 // ================================================================
-//                           Connection
+//                        Pin Definitions
 // ================================================================
 
+// OLED Display
 #define OLED_RESET 1
+
+// Motor control pins (shared between routines)
 #define IN1 4 
 #define IN2 5 
 #define IN3 6
 #define IN4 8
-#define CPT_US_CENTRAL_ECHO_PIN 26
+
+// Forward Ultrasonic Sensor pins
+#define CPT_US_RIGHT_TRIG_PIN 35
+#define CPT_US_RIGHT_ECHO_PIN 34 
+#define CPT_US_LEFT_TRIG_PIN 31
+#define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
+
+// Encoder pins
 #define ENC_LEFT_1 3
 #define ENC_LEFT_2 2
 #define ENC_RIGHT_1 19
 #define ENC_RIGHT_2 18
-#define RELAY 50
+
+//Relay
+#define RELAY 25 //TODO: changer la pin de la tirette.
+
+//Banner Routine Pin Definitions
+#define PIN_PINCE_FERMETURE 48
+#define PIN_VENTILLO 47
+#define PIN_PINCE_OUVERTURE 46
+#define PIN_SERVO 49
+#define PIN_EJECTEUR 50
+#define PIN_EJECTEUR_RETRACTION 51
+#define MOTOR_SPEED 40 //TODO: mettre dans parametres
 
 // ================================================================
 //                    Initialisation functions
 // ================================================================
 
 void moveForward();
-void turnLeft();
+void moveBackward();
 void turnRight180();
 void turnLeft180();
 void turnRight90();
@@ -35,20 +58,31 @@ void turnLeft90();
 void deactivateUSSensor();
 void activateUSSensor();
 
+void deployBanner();
+void dropBanner();
 
 // ================================================================
 //                           Parameters
 // ================================================================
 
-volatile float speed = 80; //Good value is 80
+// generalSpeed settings for general normal movement (using encoder feedback)
+volatile float generalSpeed = 80; //Good value is 80
 const float offsetRightLeft = 112.5/100; // 112.5/100
 
+// Timing for overall run (in seconds)
 const int stopAfterSec = 10000;
 const int delayStartSec = 2;
+
+// Ultrasonic obstacle threshold and reading interval (in ms)
 const float obstacleThreshold = 15.0;
 const int ultrasonicInterval = 50;
 
+// For encoder-based movement
 float tickrateByDegre = 29.722;
+
+// ================================================================
+//                       Movements sequences
+// ================================================================
 
 const Movement movementSequence[] = {
   {40, moveForward, false, 0},
@@ -59,26 +93,21 @@ const Movement movementSequence[] = {
   {60, moveForward, false, 0},
 };
 
+const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
+int movementSequenceNumber = 0;
+Movement currentMovement = movementSequence[movementSequenceNumber];
 
 // ================================================================
 //                           Initialisation
 // ================================================================
 
-const float speedRight = speed;
-const float speedLeft = speed * offsetRightLeft;
+const float speedRight = generalSpeed;
+const float speedLeft = generalSpeed * offsetRightLeft;
 
 bool sensorOff = false;
 int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
-float obstacleRightDistance = 0.0;
-float obstacleLeftDistance = 0.0;
-float obstacleCentralDistance = 0.0;
-unsigned long startTime;
-unsigned long lastUltrasonicCheck = 0;
-bool currentSensor = false;
 
-const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
-int movementSequenceNumber = 0;
-Movement currentMovement = movementSequence[movementSequenceNumber];
+unsigned int startTime;
 
 UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
@@ -89,8 +118,15 @@ int ultrasonicSensorCount = sizeof(sensors) / sizeof(sensors[0]);
 
 Encoder encLeft(ENC_LEFT_1, ENC_LEFT_2);
 Encoder encRight(ENC_RIGHT_1, ENC_RIGHT_2);
-long distanceEncLeft;
-long distanceEncRight;
+
+// Servo for the banner routine
+Servo myServo;
+
+// OLED display – adjust parameters as needed for your hardware.
+Adafruit_SSD1306 display(OLED_RESET);
+
+// Global flag to ensure the banner routine is executed only once.
+bool bannerExecuted = false;
 
 // ================================================================
 //                           FSM States
@@ -112,8 +148,10 @@ State currentState = IDLE;
 void setup() {
   Serial.begin(9600);
 
+  // Initialize relay
   pinMode(RELAY, INPUT_PULLUP);
 
+  // Motor pins
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
@@ -124,16 +162,31 @@ void setup() {
     pinMode(sensors[i].echoPin, INPUT);
   }
 
+  // Initialize display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
 
+  // -----------------------
+  // Banner routine pin setup
+  // -----------------------
+  pinMode(PIN_PINCE_FERMETURE, OUTPUT);
+  pinMode(PIN_VENTILLO, OUTPUT);
+  pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+  pinMode(PIN_EJECTEUR, OUTPUT);
+  pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
+  myServo.attach(PIN_SERVO);
+
+  myServo.write(10);
+  digitalWrite(PIN_PINCE_FERMETURE, HIGH);
+  delay(3000); // used to be TIME_1
+  digitalWrite(PIN_PINCE_FERMETURE, LOW);
 }
 
 // ================================================================
 //                           Loop (FSM Logic)
 // ================================================================
 void loop() {
-  unsigned long elapsedTime = (millis() - startTime)/100; // Temps écoulé en DIXIEMES de secondes
+  unsigned int elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
   updateScore(elapsedTime);
   readUltrasonicSensors();
 
@@ -143,14 +196,15 @@ void loop() {
     
     case IDLE:
       if(digitalRead(RELAY) == HIGH){
-        Serial.println("tirette");
+        Serial.println("IDLE");
         startTime = millis();
         currentState = START;
       }
       break;
       
     case START:
-      if (elapsedTime >= delayStartSec * 1000) {
+      if (elapsedTime * 1000 >= delayStartSec) {
+        Serial.println("START");
         currentState = RUNNING;
       }
       break;
@@ -158,7 +212,7 @@ void loop() {
     case RUNNING:
       if (sensorDetect != 1000 && !sensorOff) {
         currentState = AVOID_OBSTACLE;
-      } else if (elapsedTime >= (maxTime/100)) {
+      } else if (elapsedTime >= (maxTime / 1000)) {
         currentState = STOPPED;
       } else {
         applyMovementSequence();      
@@ -187,27 +241,18 @@ void applyMovementSequence(){
   }
   
   if (currentMovement.isEnd) {
-    // Serial.println(movementSequenceNumber);
     currentMovement = movementSequence[++movementSequenceNumber];
     stopMotors();
-    delay(1500);
+    delay(1000);
     resetEnc();
   } else {
     currentMovement.movement();
   }
 }
 
-void deactivateUSSensor(){
-  sensorOff = true;
-  currentMovement.isEnd = true;
-}
-
-void activateUSSensor(){
-  sensorOff = false;
-  currentMovement.isEnd = true;
-}
-
-
+// -----------------------------------------------------
+// Encoder functions
+// -----------------------------------------------------
 void resetEnc(){
   encLeft.write(0);
   encRight.write(0);
@@ -221,15 +266,83 @@ long cmToTickrate(long centimeters){
   return centimeters * 200;
 }
 
+// -----------------------------------------------------
+// Ultrasonic functions
+// -----------------------------------------------------
+void deactivateUSSensor(){
+  sensorOff = true;
+  currentMovement.isEnd = true;
+}
+
+void activateUSSensor(){
+  sensorOff = false;
+  currentMovement.isEnd = true;
+}
+
+/*
+  readUltrasonic(int trigPin, int echoPin)
+  Description: Measures the distance using an ultrasonic sensor.
+  Parameters: 
+    - trigPin (int): The trigger pin of the ultrasonic sensor.
+    - echoPin (int): The echo pin of the ultrasonic sensor.
+  Returns: 
+    - float: The measured distance in centimeters.
+*/
+float readUltrasonic(int trigPin, int echoPin){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 10000);
+  return (duration * .0343) / 2; 
+}
+
+/**
+ * @brief Mesure la distance avec tous les capteurs ultrason.
+ *
+ * Pour chaque capteur, envoie une impulsion et mesure la durée de l'écho afin de calculer la distance.
+ * Met à jour le champ distance et le booléen isNear pour chaque capteur.
+ */
+void readUltrasonicSensors() {
+  for (int i = 0; i < ultrasonicSensorCount; i++) {    
+    digitalWrite(sensors[i].trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(sensors[i].trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(sensors[i].trigPin, LOW);
+    long obstacle_duration = pulseIn(sensors[i].echoPin, HIGH, 3000);
+    if (obstacle_duration == 0) {
+      sensors[i].distance = 100;
+    }
+    else {
+      sensors[i].distance = obstacle_duration * 0.034 / 2;
+    }
+    sensors[i].isNear = (sensors[i].distance <= obstacleThreshold);
+  }
+}
+
+int checkUltrasonicSensors(){
+  for (int i = 0; i < ultrasonicSensorCount; i++) {
+    if(sensors[i].isNear){
+      return i;
+    }
+  }
+  return 1000;
+}
+
+// -----------------------------------------------------
+// Movement functions
+// -----------------------------------------------------
 /**
  * @brief Fait avancer le robot.
  *
  * Active les moteurs pour un mouvement en avant.
  */
 void moveForward() {
-  // Serial.println("moveForward");
+  Serial.println("moveForward");
   currentMovement.position = averageTickrate();
-
   if (currentMovement.position >= cmToTickrate(currentMovement.distance)) {
     currentMovement.isEnd = true;
     return;
@@ -238,6 +351,18 @@ void moveForward() {
   digitalWrite(IN2, LOW);
   analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
+}
+
+void moveBackward() {
+  currentMovement.position = averageTickrate();
+  if (currentMovement.position <= -cmToTickrate(currentMovement.distance)) {
+    currentMovement.isEnd = true;
+    return;
+  }
+  digitalWrite(IN1, LOW);
+  analogWrite(IN2, speedLeft);
+  digitalWrite(IN3, LOW);
+  analogWrite(IN4, speedRight);
 }
 
 /**
@@ -306,18 +431,6 @@ void turnLeft90() {
 }
 
 /**
- * @brief Fait tourner le robot vers la droite.
- *
- * Active les moteurs de manière à effectuer une rotation vers la droite.
- */
-void turnLeft() {
-  digitalWrite(IN1, LOW);
-  analogWrite(IN2, speedLeft);
-  analogWrite(IN3, speedRight);
-  digitalWrite(IN4, LOW);
-}
-
-/**
  * @brief Arrête tous les moteurs du robot.
  *
  * Met les pins des moteurs à LOW pour arrêter tout mouvement.
@@ -330,6 +443,9 @@ void stopMotors() {
   digitalWrite(IN4, LOW);
 }
 
+// -----------------------------------------------------
+// Score update function (for OLED)
+// -----------------------------------------------------
 /**
  * @brief Met à jour l'affichage du score en fonction du temps écoulé.
  *
@@ -342,18 +458,19 @@ void stopMotors() {
  */
 void updateScore(int time) {
   int score;
+  long sec = 1000;
   const char* smiley;
-  if (time > 20) {
+  if (time > 20*sec) {
     score = 45;
-  } else if (time > 14) {
+  } else if (time > 14*sec) {
     score = 35;
-  } else if (time > 4) {
+  } else if (time > 4*sec) {
     score = 20;
   } else {
     score = 0;
   }
 
-  if ((time/8)%2) {
+  if ((time/800)%2) {
     smiley = "(>'-')> SCORE <('-'<)";
   } else {
     smiley = "<('-'<) SCORE (>'-')>";
@@ -370,79 +487,37 @@ void updateScore(int time) {
   display.display();
 }
 
-
-/*
-  readUltrasonic(int trigPin, int echoPin)
-  Description: Measures the distance using an ultrasonic sensor.
-  Parameters: 
-    - trigPin (int): The trigger pin of the ultrasonic sensor.
-    - echoPin (int): The echo pin of the ultrasonic sensor.
-  Returns: 
-    - float: The measured distance in centimeters.
-*/
-float readUltrasonic(int trigPin, int echoPin){
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  long duration = pulseIn(echoPin, HIGH, 10000);
-  return (duration * .0343) / 2; 
+// -----------------------------------------------------
+// Banner Routine Implementation
+// -----------------------------------------------------
+void deployBanner() {  
+  // Step 3: Move servo to new position for repositioning
+  myServo.write(120);
+  delay(1000);  // stabilization delay
+  digitalWrite(PIN_VENTILLO, HIGH);
+  currentMovement.isEnd = true;
 }
 
-/**
- * @brief Mesure la distance avec tous les capteurs ultrason.
- *
- * Pour chaque capteur, envoie une impulsion et mesure la durée de l'écho afin de calculer la distance.
- * Met à jour le champ distance et le booléen isNear pour chaque capteur.
- */
-void readUltrasonicSensors() {
-  for (int i = 0; i < ultrasonicSensorCount; i++) {    
-    digitalWrite(sensors[i].trigPin, LOW);
-    delayMicroseconds(2);
-    digitalWrite(sensors[i].trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(sensors[i].trigPin, LOW);
-    long obstacle_duration = pulseIn(sensors[i].echoPin, HIGH, 3000);
-    if (obstacle_duration == 0) {
-      sensors[i].distance = 100;
-    }
-    else {
-      sensors[i].distance = obstacle_duration * 0.034 / 2;
-    }
-    sensors[i].isNear = (sensors[i].distance <= obstacleThreshold);
-  }
-}
-
-int checkUltrasonicSensors(){
-  for (int i = 0; i < ultrasonicSensorCount; i++) {
-    if(sensors[i].isNear){
-      return i;
-    }
-  }
-  return 1000;
-}
-
-/*
-  updateUltrasonicReadings()
-  Description: Updates the ultrasonic sensor readings at a fixed interval.
-  Parameters: None
-  Returns: None
-*/
-void updateUltrasonicReadings() {
-  unsigned long currentTime = millis();
+void dropBanner() {
+  // Step 8: Deactivate ventilo
+  digitalWrite(PIN_VENTILLO, LOW);
   
-  if (currentTime - lastUltrasonicCheck >= ultrasonicInterval) {
-    lastUltrasonicCheck = currentTime;
-    
-    if (currentSensor) {
-      obstacleLeftDistance = readUltrasonic(CPT_US_LEFT_TRIG_PIN, CPT_US_LEFT_ECHO_PIN);
-    } else {
-      obstacleRightDistance = readUltrasonic(CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN);
-    }
-    
-    currentSensor = !currentSensor;
-  }
+  // Step 9: Activate pince ouverture
+  digitalWrite(PIN_PINCE_OUVERTURE, HIGH);
+  delay(4000); // used to be TIME_5
+  digitalWrite(PIN_PINCE_OUVERTURE, LOW);
+  
+  // Step 10: Activate ejecteur
+  digitalWrite(PIN_EJECTEUR, HIGH);
+  delay(2200); // used to be TIME_7
+  digitalWrite(PIN_EJECTEUR, LOW);
+  
+  // Step 11: Reset section - reposition servo and retract ejecteur
+  myServo.write(10);
+  digitalWrite(PIN_EJECTEUR_RETRACTION, HIGH);
+  delay(2200); // used to be TIME_7
+  digitalWrite(PIN_EJECTEUR_RETRACTION, LOW);
+  currentMovement.isEnd = true;
 }
+
 
