@@ -25,6 +25,12 @@
 #define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
+#define CPT_US_BACK_RIGHT_TRIG_PIN 38
+#define CPT_US_BACK_RIGHT_ECHO_PIN 39
+#define CPT_US_BACK_LEFT_TRIG_PIN 40
+#define CPT_US_BACK_LEFT_ECHO_PIN 41
+#define CPT_US_BACK_CENTRAL_TRIG_PIN 28
+#define CPT_US_BACK_CENTRAL_ECHO_PIN 29
 
 // Encoder pins
 #define ENC_LEFT_1 3
@@ -84,6 +90,10 @@ const int ultrasonicInterval = 50;
 // For encoder-based movement
 float tickrateByDegre = 29.722;
 
+// For delaying score update
+const unsigned long interval = 500;
+const unsigned long lastUpdateTime = 0;
+
 // ================================================================
 //                       Movements sequences
 // ================================================================
@@ -133,6 +143,9 @@ UltrasonicSensor sensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
   {CPT_US_LEFT_TRIG_PIN, CPT_US_LEFT_ECHO_PIN, 100, false},
   {CPT_US_CENTRAL_TRIG_PIN, CPT_US_CENTRAL_ECHO_PIN, 100, false},
+  {CPT_US_BACK_RIGHT_TRIG_PIN, CPT_US_BACK_RIGHT_ECHO_PIN, 100, false},
+  {CPT_US_BACK_LEFT_TRIG_PIN, CPT_US_BACK_LEFT_ECHO_PIN, 100, false},
+  {CPT_US_BACK_CENTRAL_TRIG_PIN, CPT_US_BACK_CENTRAL_ECHO_PIN, 100, false},
 };
 int ultrasonicSensorCount = sizeof(sensors) / sizeof(sensors[0]);
 
@@ -215,8 +228,11 @@ void setup() {
 //                           Loop (FSM Logic)
 // ================================================================
 void loop() {
-  unsigned long elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
-  updateScore(elapsedTime);
+  unsigned long elapsedTime = millis() - startTime; // Temps écoulé en millièmes de secondes
+  if (millis() - lastUpdateTime >= interval){
+    lastUpdateTime = millis();
+    updateScore(elapsedTime);
+  }
   readUltrasonicSensors();
 
   selectSequences();
@@ -501,7 +517,7 @@ void updateScore(unsigned long time) {
     score = 0;
   }
 
-  if ((time/800)%2) {
+  if ((time/500)%2) {
     smiley = "(>'-')> SCORE <('-'<)";
   } else {
     smiley = "<('-'<) SCORE (>'-')>";
