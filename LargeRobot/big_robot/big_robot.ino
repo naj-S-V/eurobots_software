@@ -25,6 +25,12 @@
 #define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
+// #define CPT_US_BACK_RIGHT_TRIG_PIN 38
+// #define CPT_US_BACK_RIGHT_ECHO_PIN 39
+// #define CPT_US_BACK_LEFT_TRIG_PIN 40
+// #define CPT_US_BACK_LEFT_ECHO_PIN 41
+// #define CPT_US_BACK_CENTRAL_TRIG_PIN 28
+// #define CPT_US_BACK_CENTRAL_ECHO_PIN 29
 
 // Encoder pins
 #define ENC_LEFT_1 3
@@ -177,9 +183,6 @@ void setup() {
   pinMode(SWITCH_MSB, INPUT);
   pinMode(SWITCH_LSB, INPUT);
 
-  LSB = digitalRead(SWITCH_LSB);
-  MSB = digitalRead(SWITCH_MSB);
-
   // Motor pins
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -198,17 +201,17 @@ void setup() {
   // -----------------------
   // Banner routine pin setup
   // -----------------------
-  pinMode(PIN_PINCE_FERMETURE, OUTPUT);
-  pinMode(PIN_VENTILLO, OUTPUT);
-  pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
-  pinMode(PIN_EJECTEUR, OUTPUT);
-  pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
-  myServo.attach(PIN_SERVO);
+  // pinMode(PIN_PINCE_FERMETURE, OUTPUT);
+  // pinMode(PIN_VENTILLO, OUTPUT);
+  // pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+  // pinMode(PIN_EJECTEUR, OUTPUT);
+  // pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
+  // myServo.attach(PIN_SERVO);
 
-  myServo.write(10);
-  digitalWrite(PIN_PINCE_FERMETURE, HIGH);
-  delay(3000); // used to be TIME_1
-  digitalWrite(PIN_PINCE_FERMETURE, LOW);
+  // myServo.write(10);
+  // digitalWrite(PIN_PINCE_FERMETURE, HIGH);
+  // delay(3000); // used to be TIME_1
+  // digitalWrite(PIN_PINCE_FERMETURE, LOW);
 }
 
 // ================================================================
@@ -219,7 +222,7 @@ void loop() {
   updateScore(elapsedTime);
   readUltrasonicSensors();
 
-  selectSequences();
+  // selectSequences();
 
   unsigned int sensorDetect = checkUltrasonicSensors();
     
@@ -229,7 +232,7 @@ void loop() {
       if(digitalRead(RELAY) == HIGH){
         // Serial.println("IDLE");
         startTime = millis();
-        // currentState = START;
+        currentState = START;
       }
       break;
       
@@ -551,7 +554,7 @@ void dropBanner() {
   currentMovement.isEnd = true;
 }
 
-void selectSequences(){
+int selectSequences(){
   int valeur = 0;
   if (digitalRead(SWITCH_MSB) == 1) {
     valeur += 2;
