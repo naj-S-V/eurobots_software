@@ -60,8 +60,8 @@ volatile float speed = 80; // Good value is 80
 const float offsetRightLeft = 112.5 / 100.0; // 112.5/100
 
 // Timing for overall run (in seconds for stopAfterSec and delayStartSec)
-const int stopAfterSec = 10000;
-const int delayStartSec = 2;
+const unsigned long stopAfterSec = 10000;
+const unsigned long delayStartSec = 2;
 
 // Ultrasonic obstacle threshold and reading interval (in ms)
 const float obstacleThreshold = 15.0;
@@ -470,7 +470,7 @@ void updateUltrasonicReadings() {
 // -----------------------------------------------------
 // Score update function (for OLED)
 // -----------------------------------------------------
-void updateScore(int time) {
+void updateScore(unsigned long time) {
   int score;
   const char* smiley;
   if (time > 20) {
