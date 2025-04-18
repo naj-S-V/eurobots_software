@@ -68,6 +68,9 @@ void turnLeft90();
 void deactivateUSSensor();
 void activateUSSensor();
 
+void checkEncoderOn();
+void checkEncoderOff();
+
 void deployBanner();
 void dropBanner();
 
@@ -90,21 +93,49 @@ const int ultrasonicInterval = 50;
 // For encoder-based movement
 float tickrateByDegre = 29.722;
 
+const unsigned long blockTimeout = 2000;
+
 // ================================================================
 //                       Movements sequences
 // ================================================================
 
-const Movement movementSequence[] = {
+// Movement movementSequence[] = {
+//   {40, moveForward, false, 0},
+//   {1000, turnRight90, false, 0},
+//   {40, moveForward, false, 0},
+//   {1000, turnLeft90, false, 0},
+//   {1000, deactivateUSSensor, false, 0},
+//   {1000, checkEncoderOn, false, 0},
+//   {100 ,moveBackward, false, 0},
+//   {1000, checkEncoderOff, false, 0},
+//   {40, moveForward, false, 0},
+// };
+
+Movement movementSequence[] = {
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, deactivateUSSensor, false, 0},
-  {60, moveBackward, false, 0},
-  {40, moveForward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {30, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
+  {70, moveBackward, false, 0},
 };
 
-// const Movement movementSequence[] = {
+// Movement movementSequence[] = {
+//   {1000, checkEncoderOn, false, 0},
+//   {60, moveBackward, false, 0},
+//   {1000, checkEncoderOff, false, 0},
+//   {40, moveForward, false, 0},
+// };
+
+// Movement movementSequence1[] = {
 //   {1000, deactivateUSSensor, false, 0},
 //   {6, moveForward, false, 0},
 //   {1000, deployBanner, false, 0},
@@ -119,8 +150,8 @@ const Movement movementSequence[] = {
 //   {60, moveForward, false, 0}
 // };
 
-const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
-int movementSequenceNumber = 0;
+const int movementSequenceCount  = sizeof(movementSequence) / sizeof(movementSequence[0]);
+int movementSequenceNumber  = 0;
 Movement currentMovement = movementSequence[movementSequenceNumber];
 
 // ================================================================
@@ -156,6 +187,11 @@ bool bannerExecuted = false;
 
 int MSB;
 int LSB;
+
+bool checkEncoder = false;
+long lastLeftEncoder = 0;
+long lastRightEncoder = 0;
+unsigned long lastEncoderChangeTime = 0;
 
 // ================================================================
 //                           FSM States
@@ -198,6 +234,8 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
 
+
+
   // -----------------------
   // Banner routine pin setup
   // -----------------------
@@ -219,8 +257,9 @@ void setup() {
 // ================================================================
 void loop() {
   unsigned long elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
-  updateScore(elapsedTime);
+  // updateScore(elapsedTime);
   readUltrasonicSensors();
+  isRobotBlocked();
 
   // selectSequences();
 
@@ -269,13 +308,13 @@ void loop() {
 // ================================================================
 
 void applyMovementSequence(){
-  if (movementSequenceNumber >= movementSequenceCount) {
+  if (movementSequenceNumber  >= movementSequenceCount ) {
     stopMotors();
     return;
   }
   
   if (currentMovement.isEnd) {
-    currentMovement = movementSequence[++movementSequenceNumber];
+    currentMovement = movementSequence[++movementSequenceNumber ];
     stopMotors();
     delay(1000);
     resetEnc();
@@ -298,6 +337,41 @@ long averageTickrate(){
 
 long cmToTickrate(long centimeters){ 
   return centimeters * 200;
+}
+
+void checkEncoderOn(){
+  checkEncoder = true;
+  currentMovement.isEnd = true;
+}
+
+void checkEncoderOff(){
+  checkEncoder = false;
+  currentMovement.isEnd = true;
+}
+
+void isRobotBlocked(){
+   if(checkEncoder) {
+    // Serial.println(checkEncoder);
+    long currentLeft = encLeft.read();
+    long currentRight = encRight.read();
+
+    // Vérifie si les encodeurs ont changé
+    if (abs(currentLeft - lastLeftEncoder) > 5 || abs(currentRight - lastRightEncoder) > 5) {
+      // Serial.println("Maj encoder");
+      lastEncoderChangeTime = millis(); // Met à jour le dernier moment de mouvement
+      lastLeftEncoder = currentLeft;
+      lastRightEncoder = currentRight;
+    } 
+    if (millis() - lastEncoderChangeTime > blockTimeout) {
+      // Serial.println("Change");
+      currentMovement.isEnd = true;
+
+      // Met à jour l'état pour éviter répétition
+      lastEncoderChangeTime = millis(); 
+      lastLeftEncoder = currentLeft;
+      lastRightEncoder = currentRight;
+    }
+  }
 }
 
 // -----------------------------------------------------
@@ -386,6 +460,24 @@ void moveForward() {
   analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
+
+// void moveForward() {
+//   Serial.println("moveForward");
+//   currentMovement.position = averageTickrate();
+//   long distance = cmToTickrate(currentMovement.distance);
+//   if (currentMovement.position >= distance) {
+//     currentMovement.isEnd = true;
+//     return;
+//   }
+//   if(encLeft.read() <= distance) {
+//     analogWrite(IN1, speedLeft);
+//     digitalWrite(IN2, LOW);
+//   }
+//   if(encRight.read() <= distance) {
+//     analogWrite(IN3, speedRight);
+//     digitalWrite(IN4, LOW);
+//   }
+// }
 
 void moveBackward() {
   currentMovement.position = averageTickrate();
@@ -565,7 +657,7 @@ int selectSequences(){
 
   switch(valeur){
     case 0: 
-      Serial.println(0);
+      // movementSequence = movementSequence;
       break;
     case 1: 
       Serial.println(1);
