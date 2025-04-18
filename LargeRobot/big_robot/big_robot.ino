@@ -33,7 +33,11 @@
 #define ENC_RIGHT_2 18
 
 //Relay
-#define RELAY 25 //TODO: changer la pin de la tirette.
+#define RELAY 24 //TODO: changer la pin de la tirette.
+
+//Switches
+#define SWITCH_MSB 52
+#define SWITCH_LSB 53
 
 //Banner Routine Pin Definitions
 #define PIN_PINCE_FERMETURE 48
@@ -70,8 +74,8 @@ volatile float generalSpeed = 80; //Good value is 80
 const float offsetRightLeft = 112.5/100; // 112.5/100
 
 // Timing for overall run (in seconds)
-const int stopAfterSec = 10000;
-const int delayStartSec = 2;
+const unsigned long stopAfterSec = 100;
+const unsigned long delayStartSec = 5;
 
 // Ultrasonic obstacle threshold and reading interval (in ms)
 const float obstacleThreshold = 15.0;
@@ -88,10 +92,26 @@ const Movement movementSequence[] = {
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
-  {1000, turnRight90, false, 0},
+  {1000, turnLeft90, false, 0},
   {1000, deactivateUSSensor, false, 0},
-  {60, moveForward, false, 0},
+  {60, moveBackward, false, 0},
+  {40, moveForward, false, 0},
 };
+
+// const Movement movementSequence[] = {
+//   {1000, deactivateUSSensor, false, 0},
+//   {6, moveForward, false, 0},
+//   {1000, deployBanner, false, 0},
+//   {8, moveBackward, false, 0},
+//   {1000, dropBanner, false, 0},
+//   {1000, activateUSSensor, false, 0},
+//   {40, moveForward, false, 0},
+//   {1000, turnRight90, false, 0},
+//   {40, moveForward, false, 0},
+//   {1000, turnRight90, false, 0},
+//   {1000, deactivateUSSensor, false, 0},
+//   {60, moveForward, false, 0}
+// };
 
 const int movementSequenceCount = sizeof(movementSequence) / sizeof(movementSequence[0]);
 int movementSequenceNumber = 0;
@@ -128,6 +148,9 @@ Adafruit_SSD1306 display(OLED_RESET);
 // Global flag to ensure the banner routine is executed only once.
 bool bannerExecuted = false;
 
+int MSB;
+int LSB;
+
 // ================================================================
 //                           FSM States
 // ================================================================
@@ -150,6 +173,12 @@ void setup() {
 
   // Initialize relay
   pinMode(RELAY, INPUT_PULLUP);
+
+  pinMode(SWITCH_MSB, INPUT);
+  pinMode(SWITCH_LSB, INPUT);
+
+  LSB = digitalRead(SWITCH_LSB);
+  MSB = digitalRead(SWITCH_MSB);
 
   // Motor pins
   pinMode(IN1, OUTPUT);
@@ -186,9 +215,11 @@ void setup() {
 //                           Loop (FSM Logic)
 // ================================================================
 void loop() {
-  unsigned int elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
+  unsigned long elapsedTime = millis() - startTime; // Temps écoulé en DIXIEMES de secondes
   updateScore(elapsedTime);
   readUltrasonicSensors();
+
+  selectSequences();
 
   unsigned int sensorDetect = checkUltrasonicSensors();
     
@@ -196,15 +227,15 @@ void loop() {
     
     case IDLE:
       if(digitalRead(RELAY) == HIGH){
-        Serial.println("IDLE");
+        // Serial.println("IDLE");
         startTime = millis();
-        currentState = START;
+        // currentState = START;
       }
       break;
       
     case START:
       if (elapsedTime * 1000 >= delayStartSec) {
-        Serial.println("START");
+        // Serial.println("START");
         currentState = RUNNING;
       }
       break;
@@ -456,7 +487,7 @@ void stopMotors() {
  *
  * @param time Le temps écoulé en dixièmes de secondes, utilisé pour déterminer le score.
  */
-void updateScore(int time) {
+void updateScore(unsigned long time) {
   int score;
   long sec = 1000;
   const char* smiley;
@@ -520,4 +551,27 @@ void dropBanner() {
   currentMovement.isEnd = true;
 }
 
+void selectSequences(){
+  int valeur = 0;
+  if (digitalRead(SWITCH_MSB) == 1) {
+    valeur += 2;
+  }
+  if (digitalRead(SWITCH_LSB) == 1) {
+    valeur += 1;
+  }
 
+  switch(valeur){
+    case 0: 
+      Serial.println(0);
+      break;
+    case 1: 
+      Serial.println(1);
+      break;
+    case 2: 
+      Serial.println(2);
+      break;
+    case 3: 
+      Serial.println(3);
+      break;
+  }
+}
