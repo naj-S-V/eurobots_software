@@ -25,10 +25,10 @@
 #define CPT_US_LEFT_ECHO_PIN 30
 #define CPT_US_CENTRAL_TRIG_PIN 27
 #define CPT_US_CENTRAL_ECHO_PIN 26
-#define CPT_US_BACK_RIGHT_TRIG_PIN 38
-#define CPT_US_BACK_RIGHT_ECHO_PIN 39
-#define CPT_US_BACK_LEFT_TRIG_PIN 40
-#define CPT_US_BACK_LEFT_ECHO_PIN 41
+#define CPT_US_BACK_RIGHT_TRIG_PIN 39
+#define CPT_US_BACK_RIGHT_ECHO_PIN 38
+#define CPT_US_BACK_LEFT_TRIG_PIN 41
+#define CPT_US_BACK_LEFT_ECHO_PIN 40
 #define CPT_US_BACK_CENTRAL_TRIG_PIN 28
 #define CPT_US_BACK_CENTRAL_ECHO_PIN 29
 
@@ -105,12 +105,21 @@ unsigned long lastUpdateTime = 0;
 //                       Movements sequences
 // ================================================================
 
-Movement movementSequence[] = {
+// Movement choice at the beginning
+bool movementCreated = false;
+const Movement blueMovementSequence[] = {
+
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, deactivateUSSensor, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {50, moveForward, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
@@ -122,24 +131,34 @@ Movement movementSequence[] = {
   {70, moveBackward, false, 0},
 };
 
-Movement movementSequence1[] = {
-  // {40, moveForward, false, 0},
-  {1000, turnRight90, false, 0},
+const Movement yellowMovementSequence[] = {
   {40, moveForward, false, 0},
-  {1000, turnLeft90, false, 0},
+  {1000, turnLeftt90, false, 0},
+  {40, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
   {1000, deactivateUSSensor, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {50, moveForward, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
   {1000, activateUSSensor, false, 0},
   {60, moveForward, false, 0},
-  {1000, turnRight90, false, 0},
+  {1000, turnLeft90, false, 0},
   {30, moveForward, false, 0},
-  {1000, turnRight90, false, 0},
+  {1000, turnLeft90, false, 0},
   {70, moveBackward, false, 0},
 };
 
-// Movement movementSequence1[] = {
+const Movement* movementSequence = nullptr;
+Movement currentMovement;
+
+// const Movement movementSequence[] = {
+
 //   {1000, deactivateUSSensor, false, 0},
 //   {6, moveForward, false, 0},
 //   {1000, deployBanner, false, 0},
@@ -154,11 +173,8 @@ Movement movementSequence1[] = {
 //   {60, moveForward, false, 0}
 // };
 
-const Movement* choosedSequence = nullptr;
-
-int choosedSequenceCount  = sizeof(choosedSequence) / sizeof(Movement);
-int choosedSequenceNumber  = 0;
-Movement currentMovement;
+const int movementSequenceCount = sizeof(blueMovementSequence) / sizeof(blueMovementSequence[0]);
+int movementSequenceNumber = 0;
 
 // ================================================================
 //                           Initialisation
@@ -172,15 +188,19 @@ int maxTime = (stopAfterSec * 1000) + (delayStartSec * 1000);
 
 unsigned int startTime;
 
-UltrasonicSensor sensors[] = {
+UltrasonicSensor frontSensors[] = {
   {CPT_US_RIGHT_TRIG_PIN, CPT_US_RIGHT_ECHO_PIN, 100, false},
   {CPT_US_LEFT_TRIG_PIN, CPT_US_LEFT_ECHO_PIN, 100, false},
   {CPT_US_CENTRAL_TRIG_PIN, CPT_US_CENTRAL_ECHO_PIN, 100, false},
+};
+int frontUltrasonicSensorCount = sizeof(frontSensors) / sizeof(frontSensors[0]);
+
+UltrasonicSensor backSensors[]{
   {CPT_US_BACK_RIGHT_TRIG_PIN, CPT_US_BACK_RIGHT_ECHO_PIN, 100, false},
   {CPT_US_BACK_LEFT_TRIG_PIN, CPT_US_BACK_LEFT_ECHO_PIN, 100, false},
   {CPT_US_BACK_CENTRAL_TRIG_PIN, CPT_US_BACK_CENTRAL_ECHO_PIN, 100, false},
 };
-int ultrasonicSensorCount = sizeof(sensors) / sizeof(sensors[0]);
+int backUltrasonicSensorCount = sizeof(backSensors) / sizeof(backSensors[0]);
 
 Encoder encLeft(ENC_LEFT_1, ENC_LEFT_2);
 Encoder encRight(ENC_RIGHT_1, ENC_RIGHT_2);
@@ -236,9 +256,13 @@ void setup() {
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
 
-  for(int i = 0; i < ultrasonicSensorCount; i++) {
-    pinMode(sensors[i].trigPin, OUTPUT);
-    pinMode(sensors[i].echoPin, INPUT);
+  for(int i = 0; i < frontUltrasonicSensorCount; i++) {
+    pinMode(frontSensors[i].trigPin, OUTPUT);
+    pinMode(frontSensors[i].echoPin, INPUT);
+  }
+  for (int i = 0; i < backUltrasonicSensorCount; i++){
+    pinMode(backSensors[i].trigPin, OUTPUT);
+    pinMode(backSensors[i].echoPin, INPUT);
   }
 
   // Initialize display
@@ -272,12 +296,13 @@ void loop() {
     lastUpdateTime = millis();
     updateScore(elapsedTime);
   }
-  readUltrasonicSensors();
+  selectSequences();
   isRobotBlocked();
 
   // Serial.println(getMovementName(currentMovement.movement));
 
-  unsigned int sensorDetect = checkUltrasonicSensors();
+  unsigned int frontSensorDetect = 1000;
+  unsigned int backSensorDetect = 1000;
     
   switch (currentState) {
     
@@ -297,7 +322,15 @@ void loop() {
       break;
     
     case RUNNING:
-      if (sensorDetect != 1000 && !sensorOff) {
+      if (currentMovement.movement != moveBackward) {
+        readFrontUltrasonicSensors();
+        frontSensorDetect = checkFrontUltrasonicSensors();
+      }
+      if (currentMovement.movement != moveForward){
+        readBackUltrasonicSensors();
+        backSensorDetect = checkBackUltrasonicSensors();
+      }
+      if (((backSensorDetect != 1000) || (frontSensorDetect != 1000)) && !sensorOff) {
         currentState = AVOID_OBSTACLE;
       } else if (elapsedTime >= (maxTime / 1000)) {
         currentState = STOPPED;
@@ -307,10 +340,10 @@ void loop() {
       break;
     
     case AVOID_OBSTACLE:
-      stopMotors();      
+      stopMotors();
       currentState = RUNNING;
       break;
-    
+
     case STOPPED:
       stopMotors();
       break;
@@ -320,12 +353,27 @@ void loop() {
 // ================================================================
 //                           Functions
 // ================================================================
+const char* getMovementName(void (*movement)()) {
+  if (movement == moveForward) return "moveForward";
+  if (movement == moveBackward) return "moveBackward";
+  if (movement == turnLeft90) return "turnLeft90";
+  if (movement == turnRight90) return "turnRight90";
+  if (movement == turnLeft180) return "turnLeft180";
+  if (movement == turnRight180) return "turnRight180";
+  if (movement == activateUSSensor) return "activateUSSensor";
+  if (movement == deactivateUSSensor) return "deactivateUSSensor";
+  if (movement == deployBanner) return "deployBanner";
+  if (movement == dropBanner) return "dropBanner";
+  return "Unknown";
+}
+
 
 void applyMovementSequence(){
   if (choosedSequenceNumber  >= choosedSequenceCount ) {
     stopMotors();
     return;
   }
+  Serial.println(getMovementName(currentMovement.movement));
   
   if (currentMovement.isEnd) {
     currentMovement = choosedSequence[++choosedSequenceNumber];
@@ -427,27 +475,62 @@ float readUltrasonic(int trigPin, int echoPin){
  * Pour chaque capteur, envoie une impulsion et mesure la durée de l'écho afin de calculer la distance.
  * Met à jour le champ distance et le booléen isNear pour chaque capteur.
  */
-void readUltrasonicSensors() {
-  for (int i = 0; i < ultrasonicSensorCount; i++) {    
-    digitalWrite(sensors[i].trigPin, LOW);
+void readBackUltrasonicSensors() {
+  for (int i = 0; i < backUltrasonicSensorCount; i++) {    
+    digitalWrite(backSensors[i].trigPin, LOW);
     delayMicroseconds(2);
-    digitalWrite(sensors[i].trigPin, HIGH);
+    digitalWrite(backSensors[i].trigPin, HIGH);
     delayMicroseconds(10);
-    digitalWrite(sensors[i].trigPin, LOW);
-    long obstacle_duration = pulseIn(sensors[i].echoPin, HIGH, 3000);
+    digitalWrite(backSensors[i].trigPin, LOW);
+    long obstacle_duration = pulseIn(backSensors[i].echoPin, HIGH, 3000);
     if (obstacle_duration == 0) {
-      sensors[i].distance = 100;
+      backSensors[i].distance = 100;
     }
     else {
-      sensors[i].distance = obstacle_duration * 0.034 / 2;
+      backSensors[i].distance = obstacle_duration * 0.034 / 2;
     }
-    sensors[i].isNear = (sensors[i].distance <= obstacleThreshold);
+    backSensors[i].isNear = (backSensors[i].distance <= obstacleThreshold);
+  }
+}
+void readFrontUltrasonicSensors() {
+  for (int i = 0; i < frontUltrasonicSensorCount; i++) {    
+    digitalWrite(frontSensors[i].trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(frontSensors[i].trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(frontSensors[i].trigPin, LOW);
+    long obstacle_duration = pulseIn(frontSensors[i].echoPin, HIGH, 3000);
+    if (obstacle_duration == 0) {
+      frontSensors[i].distance = 100;
+    }
+    else {
+      frontSensors[i].distance = obstacle_duration * 0.034 / 2;
+    }
+    frontSensors[i].isNear = (frontSensors[i].distance <= obstacleThreshold);
   }
 }
 
-int checkUltrasonicSensors(){
-  for (int i = 0; i < ultrasonicSensorCount; i++) {
-    if(sensors[i].isNear){
+int checkAllUltrasonicSensors(){
+  int i = 1000;
+  i = checkFrontUltrasonicSensors();
+  if (i != 1000){
+    i = checkBackUltrasonicSensors();
+  }
+  return i;
+}
+
+int checkFrontUltrasonicSensors(){
+  for (int i = 0; i < frontUltrasonicSensorCount; i++) {
+    if(frontSensors[i].isNear){
+      return i;
+    }
+  }
+  return 1000;
+}
+
+int checkBackUltrasonicSensors(){
+  for (int i = 0; i < backUltrasonicSensorCount; i++) {
+    if(backSensors[i].isNear){
       return i;
     }
   }
@@ -662,43 +745,23 @@ void dropBanner() {
 
 void selectSequence(){
   int valeur = 0;
-  if (digitalRead(SWITCH_MSB) == 1) {
-    valeur += 2;
-  }
-  if (digitalRead(SWITCH_LSB) == 1) {
-    valeur += 1;
-  }
+  if (digitalRead(SWITCH_MSB) == 1) valeur += 2;
+  if (digitalRead(SWITCH_LSB) == 1) valeur += 1;
+
+  if (movementCreated) return; // évite de reconfigurer
+  movementCreated = true;
 
   switch(valeur){
     case 0: 
-      Serial.println(0);
-      choosedSequence = movementSequence;
-      // memcpy(choosedSequence, movementSequence, choosedSequenceCount * sizeof(movementSequence[0]));
+    case 2:
+      movementSequence = yellowMovementSequence;
       break;
-    case 1: 
-      Serial.println(1);
-      choosedSequence = movementSequence1;
-      // memcpy(choosedSequence, movementSequence1, choosedSequenceCount * sizeof(movementSequence1[0]));
-      break;
-    case 2: 
-      Serial.println(2);
-      break;
-    case 3: 
-      Serial.println(3);
+    case 1:
+    case 3:
+      movementSequence = blueMovementSequence;
       break;
   }
-}
 
-const char* getMovementName(void (*movement)()) {
-  if (movement == moveForward) return "moveForward";
-  if (movement == moveBackward) return "moveBackward";
-  if (movement == turnLeft90) return "turnLeft90";
-  if (movement == turnRight90) return "turnRight90";
-  if (movement == turnLeft180) return "turnLeft180";
-  if (movement == turnRight180) return "turnRight180";
-  if (movement == activateUSSensor) return "activateUSSensor";
-  if (movement == deactivateUSSensor) return "deactivateUSSensor";
-  if (movement == deployBanner) return "deployBanner";
-  if (movement == dropBanner) return "dropBanner";
-  return "Unknown";
-} 
+  movementSequenceNumber = 0;
+  currentMovement = movementSequence[movementSequenceNumber];
+}
