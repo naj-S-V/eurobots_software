@@ -32,6 +32,7 @@
 #define CPT_US_BACK_CENTRAL_TRIG_PIN 28
 #define CPT_US_BACK_CENTRAL_ECHO_PIN 29
 
+
 // Encoder pins
 #define ENC_LEFT_1 3
 #define ENC_LEFT_2 2
@@ -68,6 +69,9 @@ void turnLeft90();
 void deactivateUSSensor();
 void activateUSSensor();
 
+void checkEncoderOn();
+void checkEncoderOff();
+
 void deployBanner();
 void dropBanner();
 
@@ -90,6 +94,9 @@ const int ultrasonicInterval = 50;
 // For encoder-based movement
 float tickrateByDegre = 29.722;
 
+// Timeout
+const unsigned long blockTimeout = 2000;
+
 // For delaying score update
 const unsigned long interval = 500;
 unsigned long lastUpdateTime = 0;
@@ -101,15 +108,23 @@ unsigned long lastUpdateTime = 0;
 // Movement choice at the beginning
 bool movementCreated = false;
 const Movement blueMovementSequence[] = {
+
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, deactivateUSSensor, false, 0},
-  {50, moveBackward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
   {1000, activateUSSensor, false, 0},
   {50, moveForward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {30, moveForward, false, 0},
   {1000, turnRight90, false, 0},
@@ -118,14 +133,21 @@ const Movement blueMovementSequence[] = {
 
 const Movement yellowMovementSequence[] = {
   {40, moveForward, false, 0},
-  {1000, turnLeft90, false, 0},
+  {1000, turnLeftt90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {1000, deactivateUSSensor, false, 0},
-  {50, moveBackward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
   {1000, activateUSSensor, false, 0},
   {50, moveForward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
   {30, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
@@ -136,6 +158,7 @@ const Movement* movementSequence = nullptr;
 Movement currentMovement;
 
 // const Movement movementSequence[] = {
+
 //   {1000, deactivateUSSensor, false, 0},
 //   {6, moveForward, false, 0},
 //   {1000, deployBanner, false, 0},
@@ -194,6 +217,11 @@ bool bannerExecuted = false;
 int MSB;
 int LSB;
 
+bool checkEncoder = false;
+long lastLeftEncoder = 0;
+long lastRightEncoder = 0;
+unsigned long lastEncoderChangeTime = 0;
+
 // ================================================================
 //                           FSM States
 // ================================================================
@@ -219,9 +247,8 @@ void setup() {
 
   pinMode(SWITCH_MSB, INPUT);
   pinMode(SWITCH_LSB, INPUT);
-
-  LSB = digitalRead(SWITCH_LSB);
-  MSB = digitalRead(SWITCH_MSB);
+  selectSequence();
+  currentMovement = choosedSequence[choosedSequenceNumber];
 
   // Motor pins
   pinMode(IN1, OUTPUT);
@@ -242,20 +269,22 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
 
+
+
   // -----------------------
   // Banner routine pin setup
   // -----------------------
-  pinMode(PIN_PINCE_FERMETURE, OUTPUT);
-  pinMode(PIN_VENTILLO, OUTPUT);
-  pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
-  pinMode(PIN_EJECTEUR, OUTPUT);
-  pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
-  myServo.attach(PIN_SERVO);
+  // pinMode(PIN_PINCE_FERMETURE, OUTPUT);
+  // pinMode(PIN_VENTILLO, OUTPUT);
+  // pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+  // pinMode(PIN_EJECTEUR, OUTPUT);
+  // pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
+  // myServo.attach(PIN_SERVO);
 
-  myServo.write(10);
-  digitalWrite(PIN_PINCE_FERMETURE, HIGH);
-  delay(3000); // used to be TIME_1
-  digitalWrite(PIN_PINCE_FERMETURE, LOW);
+  // myServo.write(10);
+  // digitalWrite(PIN_PINCE_FERMETURE, HIGH);
+  // delay(3000); // used to be TIME_1
+  // digitalWrite(PIN_PINCE_FERMETURE, LOW);
 }
 
 // ================================================================
@@ -268,6 +297,9 @@ void loop() {
     updateScore(elapsedTime);
   }
   selectSequences();
+  isRobotBlocked();
+
+  // Serial.println(getMovementName(currentMovement.movement));
 
   unsigned int frontSensorDetect = 1000;
   unsigned int backSensorDetect = 1000;
@@ -337,14 +369,14 @@ const char* getMovementName(void (*movement)()) {
 
 
 void applyMovementSequence(){
-  if (movementSequenceNumber >= movementSequenceCount) {
+  if (choosedSequenceNumber  >= choosedSequenceCount ) {
     stopMotors();
     return;
   }
   Serial.println(getMovementName(currentMovement.movement));
   
   if (currentMovement.isEnd) {
-    currentMovement = movementSequence[++movementSequenceNumber];
+    currentMovement = choosedSequence[++choosedSequenceNumber];
     stopMotors();
     delay(1000);
     resetEnc();
@@ -367,6 +399,41 @@ long averageTickrate(){
 
 long cmToTickrate(long centimeters){ 
   return centimeters * 200;
+}
+
+void checkEncoderOn(){
+  checkEncoder = true;
+  currentMovement.isEnd = true;
+}
+
+void checkEncoderOff(){
+  checkEncoder = false;
+  currentMovement.isEnd = true;
+}
+
+void isRobotBlocked(){
+   if(checkEncoder) {
+    // Serial.println(checkEncoder);
+    long currentLeft = encLeft.read();
+    long currentRight = encRight.read();
+
+    // Vérifie si les encodeurs ont changé
+    if (abs(currentLeft - lastLeftEncoder) > 5 || abs(currentRight - lastRightEncoder) > 5) {
+      // Serial.println("Maj encoder");
+      lastEncoderChangeTime = millis(); // Met à jour le dernier moment de mouvement
+      lastLeftEncoder = currentLeft;
+      lastRightEncoder = currentRight;
+    } 
+    if (millis() - lastEncoderChangeTime > blockTimeout) {
+      // Serial.println("Change");
+      currentMovement.isEnd = true;
+
+      // Met à jour l'état pour éviter répétition
+      lastEncoderChangeTime = millis(); 
+      lastLeftEncoder = currentLeft;
+      lastRightEncoder = currentRight;
+    }
+  }
 }
 
 // -----------------------------------------------------
@@ -490,6 +557,24 @@ void moveForward() {
   analogWrite(IN3, speedRight);
   digitalWrite(IN4, LOW);
 }
+
+// void moveForward() {
+//   Serial.println("moveForward");
+//   currentMovement.position = averageTickrate();
+//   long distance = cmToTickrate(currentMovement.distance);
+//   if (currentMovement.position >= distance) {
+//     currentMovement.isEnd = true;
+//     return;
+//   }
+//   if(encLeft.read() <= distance) {
+//     analogWrite(IN1, speedLeft);
+//     digitalWrite(IN2, LOW);
+//   }
+//   if(encRight.read() <= distance) {
+//     analogWrite(IN3, speedRight);
+//     digitalWrite(IN4, LOW);
+//   }
+// }
 
 void moveBackward() {
   currentMovement.position = averageTickrate();
@@ -658,7 +743,7 @@ void dropBanner() {
   currentMovement.isEnd = true;
 }
 
-void selectSequences(){
+void selectSequence(){
   int valeur = 0;
   if (digitalRead(SWITCH_MSB) == 1) valeur += 2;
   if (digitalRead(SWITCH_LSB) == 1) valeur += 1;
@@ -680,4 +765,3 @@ void selectSequences(){
   movementSequenceNumber = 0;
   currentMovement = movementSequence[movementSequenceNumber];
 }
-
