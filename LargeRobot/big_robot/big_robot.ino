@@ -120,6 +120,7 @@ const Movement blueMovementSequence[] = {
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
@@ -127,6 +128,13 @@ const Movement blueMovementSequence[] = {
   {25, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {1000, activateUSSensor, false, 0},
+  {50, moveForward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
+  {1000, turnRight90, false, 0},
   {30, moveForward, false, 0},
   {1000, deactivateUSSensor, false, 0},
   {1000, turnRight90, false, 0},
@@ -140,9 +148,10 @@ const Movement yellowMovementSequence[] = {
   {3, moveBackward, false, 0},
   {1000, dropBanner, false, 0},
   {40, moveForward, false, 0},
-  {1000, turnLeft90, false, 0},
+  {1000, turnLeftt90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
@@ -150,6 +159,13 @@ const Movement yellowMovementSequence[] = {
   {25, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, activateUSSensor, false, 0},
+  {50, moveForward, false, 0},
+  {1000, checkEncoderOn, false, 0},
+  {100, moveBackward, false, 0},
+  {1000, checkEncoderOff, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {60, moveForward, false, 0},
+  {1000, turnLeft90, false, 0},
   {30, moveForward, false, 0},
   {1000, deactivateUSSensor, false, 0},
   {1000, turnLeft90, false, 0},
@@ -252,6 +268,8 @@ void setup() {
   pinMode(SWITCH_LSB, INPUT);
   selectSequence();
 
+  currentMovement = choosedSequence[choosedSequenceNumber];
+
   // Motor pins
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -276,20 +294,22 @@ void setup() {
 
 
 
+
+
   // -----------------------
   // Banner routine pin setup
   // -----------------------
-  pinMode(PIN_PINCE_FERMETURE, OUTPUT);
-  pinMode(PIN_VENTILLO, OUTPUT);
-  pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
-  pinMode(PIN_EJECTEUR, OUTPUT);
-  pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
-  myServo.attach(PIN_SERVO);
+  // pinMode(PIN_PINCE_FERMETURE, OUTPUT);
+  // pinMode(PIN_VENTILLO, OUTPUT);
+  // pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+  // pinMode(PIN_EJECTEUR, OUTPUT);
+  // pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
+  // myServo.attach(PIN_SERVO);
 
-  myServo.write(10);
-  digitalWrite(PIN_PINCE_FERMETURE, HIGH);
-  delay(3000); // used to be TIME_1
-  digitalWrite(PIN_PINCE_FERMETURE, LOW);
+  // myServo.write(10);
+  // digitalWrite(PIN_PINCE_FERMETURE, HIGH);
+  // delay(3000); // used to be TIME_1
+  // digitalWrite(PIN_PINCE_FERMETURE, LOW);
 }
 
 // ================================================================
@@ -303,11 +323,8 @@ void loop() {
       messageShown = true;
     }
   }
-  if (digitalRead(RELAY) == HIGH && millis() - lastUpdateTime >= interval) {
-    lastUpdateTime = millis();
-    elapsedTime = millis() - startTime; // Temps écoulé en millièmes de secondes
-    updateScore();
-  }
+
+  selectSequences();
   isRobotBlocked();
 
   // Serial.println(getMovementName(currentMovement.movement));
@@ -380,13 +397,13 @@ const char* getMovementName(void (*movement)()) {
 
 
 void applyMovementSequence(){
-  if (movementSequenceNumber >= movementSequenceCount) {
+  if (choosedSequenceNumber  >= choosedSequenceCount ) {
     stopMotors();
     return;
   }
   
   if (currentMovement.isEnd) {
-    currentMovement = movementSequence[++movementSequenceNumber];
+    currentMovement = choosedSequence[++choosedSequenceNumber];
     stopMotors();
     delay(1000);
     resetEnc();
@@ -857,4 +874,3 @@ void waitPAMIs(){
   }
   stopMotors();
 }
-
