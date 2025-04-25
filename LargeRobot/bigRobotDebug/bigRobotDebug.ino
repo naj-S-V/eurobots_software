@@ -102,7 +102,7 @@ const unsigned long blockTimeout = 2000;
 const unsigned long interval = 500;
 unsigned long lastUpdateTime = 0;
 
-unsigned long timingPAMIs = 94000;
+unsigned long timingPAMIs = 90000;
 unsigned long elapsedTime = 0; // Temps écoulé en millièmes de secondes
 
 // ================================================================
@@ -117,6 +117,7 @@ const Movement blueMovementSequence[] = {
   {3, moveBackward, false, 0},
   {1000, dropBanner, false, 0},
   {40, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
@@ -125,18 +126,10 @@ const Movement blueMovementSequence[] = {
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {25, moveForward, false, 0},
   {1000, turnRight90, false, 0},
-  {1000, activateUSSensor, false, 0},
-  {50, moveForward, false, 0},
-  {1000, checkEncoderOn, false, 0},
-  {100, moveBackward, false, 0},
-  {1000, checkEncoderOff, false, 0},
-  {1000, activateUSSensor, false, 0},
-  {60, moveForward, false, 0},
-  {1000, turnRight90, false, 0},
   {30, moveForward, false, 0},
-  {1000, deactivateUSSensor, false, 0},
   {1000, turnRight90, false, 0},
   {1000, waitPAMIs, false, 0},
   {95, moveBackward, false, 0},
@@ -148,7 +141,8 @@ const Movement yellowMovementSequence[] = {
   {3, moveBackward, false, 0},
   {1000, dropBanner, false, 0},
   {40, moveForward, false, 0},
-  {1000, turnLeftt90, false, 0},
+  {1000, activateUSSensor, false, 0},
+  {1000, turnLeft90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
   {1000, deactivateUSSensor, false, 0},
@@ -156,18 +150,10 @@ const Movement yellowMovementSequence[] = {
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {25, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
-  {1000, activateUSSensor, false, 0},
-  {50, moveForward, false, 0},
-  {1000, checkEncoderOn, false, 0},
-  {100, moveBackward, false, 0},
-  {1000, checkEncoderOff, false, 0},
-  {1000, activateUSSensor, false, 0},
-  {60, moveForward, false, 0},
-  {1000, turnLeft90, false, 0},
   {30, moveForward, false, 0},
-  {1000, deactivateUSSensor, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, waitPAMIs, false, 0},
   {95, moveBackward, false, 0},
@@ -268,8 +254,6 @@ void setup() {
   pinMode(SWITCH_LSB, INPUT);
   selectSequence();
 
-  currentMovement = choosedSequence[choosedSequenceNumber];
-
   // Motor pins
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -294,22 +278,20 @@ void setup() {
 
 
 
-
-
   // -----------------------
   // Banner routine pin setup
   // -----------------------
-  // pinMode(PIN_PINCE_FERMETURE, OUTPUT);
-  // pinMode(PIN_VENTILLO, OUTPUT);
-  // pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
-  // pinMode(PIN_EJECTEUR, OUTPUT);
-  // pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
-  // myServo.attach(PIN_SERVO);
+  pinMode(PIN_PINCE_FERMETURE, OUTPUT);
+  pinMode(PIN_VENTILLO, OUTPUT);
+  pinMode(PIN_PINCE_OUVERTURE, OUTPUT);
+  pinMode(PIN_EJECTEUR, OUTPUT);
+  pinMode(PIN_EJECTEUR_RETRACTION, OUTPUT);
+  myServo.attach(PIN_SERVO);
 
-  // myServo.write(10);
-  // digitalWrite(PIN_PINCE_FERMETURE, HIGH);
-  // delay(3000); // used to be TIME_1
-  // digitalWrite(PIN_PINCE_FERMETURE, LOW);
+  myServo.write(10);
+  digitalWrite(PIN_PINCE_FERMETURE, HIGH);
+  delay(3000); // used to be TIME_1
+  digitalWrite(PIN_PINCE_FERMETURE, LOW);
 }
 
 // ================================================================
@@ -323,8 +305,12 @@ void loop() {
       messageShown = true;
     }
   }
-
-  selectSequences();
+  if (digitalRead(RELAY) == HIGH && millis() - lastUpdateTime >= interval) {
+    lastUpdateTime = millis();
+    elapsedTime = millis() - startTime; // Temps écoulé en millièmes de secondes
+    // updateScore(elapsedTime);
+    displayCurrentMovementName();
+  }
   isRobotBlocked();
 
   // Serial.println(getMovementName(currentMovement.movement));
@@ -356,8 +342,7 @@ void loop() {
       }
       if (currentMovement.movement != moveForward){
         readBackUltrasonicSensors();
-        // backSensorDetect = checkBackUltrasonicSensors();
-        backSensorDetect = 1000;
+        backSensorDetect = checkBackUltrasonicSensors();
       }
       if (((backSensorDetect != 1000) || (frontSensorDetect != 1000)) && !sensorOff) {
         currentState = AVOID_OBSTACLE;
@@ -378,6 +363,7 @@ void loop() {
       break;
   }
 }
+
 // ================================================================
 //                           Functions
 // ================================================================
@@ -392,18 +378,19 @@ const char* getMovementName(void (*movement)()) {
   if (movement == deactivateUSSensor) return "deactivateUSSensor";
   if (movement == deployBanner) return "deployBanner";
   if (movement == dropBanner) return "dropBanner";
+  if (movement == waitPAMIs) return "waitPAMIs";
   return "Unknown";
 }
 
 
 void applyMovementSequence(){
-  if (choosedSequenceNumber  >= choosedSequenceCount ) {
+  if (movementSequenceNumber >= movementSequenceCount) {
     stopMotors();
     return;
   }
   
   if (currentMovement.isEnd) {
-    currentMovement = choosedSequence[++choosedSequenceNumber];
+    currentMovement = movementSequence[++movementSequenceNumber];
     stopMotors();
     delay(1000);
     resetEnc();
@@ -765,39 +752,20 @@ void stopMotors() {
  *
  * @param time Le temps écoulé en dixièmes de secondes, utilisé pour déterminer le score.
  */
-void updateScore() {
-  unsigned long time = millis() - startTime;
-  int score;
-  long sec = 1000;
-  const char* smiley;
-  if (time > 100*sec) {
-    score = 45;
-  } else if (time > 90*sec) {
-    score = 39;
-  } else if (time > 20*sec) {
-    score = 24;
-  } else if (time > 10*sec) {
-    score = 20;
-  } else {
-    score = 0;
-  }
-
-  if ((time/500)%2) {
-    smiley = "(>'-')> SCORE <('-'<)";
-  } else {
-    smiley = "<('-'<) SCORE (>'-')>";
-  }
+void displayCurrentMovementName() {
+  const char* movementName = getMovementName(currentMovement.movement);
 
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0,0);
-  display.println(smiley);
+  display.setCursor(0, 0);
+  display.println("Mouvement en cours :");
   display.setTextSize(2);
-  display.setCursor(50,15);
-  display.println(score);
+  display.setCursor(10, 15);
+  display.println(movementName);
   display.display();
 }
+
 void displayWaitingMessage() {
   display.clearDisplay();
   display.setTextSize(1);
@@ -874,3 +842,4 @@ void waitPAMIs(){
   }
   stopMotors();
 }
+
