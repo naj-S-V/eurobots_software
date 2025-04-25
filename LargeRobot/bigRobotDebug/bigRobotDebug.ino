@@ -102,7 +102,7 @@ const unsigned long blockTimeout = 2000;
 const unsigned long interval = 500;
 unsigned long lastUpdateTime = 0;
 
-unsigned long timingPAMIs = 94000;
+unsigned long timingPAMIs = 90000;
 unsigned long elapsedTime = 0; // Temps écoulé en millièmes de secondes
 
 // ================================================================
@@ -117,18 +117,19 @@ const Movement blueMovementSequence[] = {
   {3, moveBackward, false, 0},
   {1000, dropBanner, false, 0},
   {40, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {1000, turnRight90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {25, moveForward, false, 0},
   {1000, turnRight90, false, 0},
-  {1000, activateUSSensor, false, 0},
   {30, moveForward, false, 0},
-  {1000, deactivateUSSensor, false, 0},
   {1000, turnRight90, false, 0},
   {1000, waitPAMIs, false, 0},
   {95, moveBackward, false, 0},
@@ -140,18 +141,19 @@ const Movement yellowMovementSequence[] = {
   {3, moveBackward, false, 0},
   {1000, dropBanner, false, 0},
   {40, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {1000, turnLeft90, false, 0},
   {40, moveForward, false, 0},
   {1000, turnRight90, false, 0},
+  {1000, deactivateUSSensor, false, 0},
   {1000, checkEncoderOn, false, 0},
   {100, moveBackward, false, 0},
   {1000, checkEncoderOff, false, 0},
   {10, moveForward, false, 0},
+  {1000, activateUSSensor, false, 0},
   {25, moveForward, false, 0},
   {1000, turnLeft90, false, 0},
-  {1000, activateUSSensor, false, 0},
   {30, moveForward, false, 0},
-  {1000, deactivateUSSensor, false, 0},
   {1000, turnLeft90, false, 0},
   {1000, waitPAMIs, false, 0},
   {95, moveBackward, false, 0},
@@ -306,7 +308,8 @@ void loop() {
   if (digitalRead(RELAY) == HIGH && millis() - lastUpdateTime >= interval) {
     lastUpdateTime = millis();
     elapsedTime = millis() - startTime; // Temps écoulé en millièmes de secondes
-    updateScore();
+    // updateScore(elapsedTime);
+    displayCurrentMovementName();
   }
   isRobotBlocked();
 
@@ -339,8 +342,7 @@ void loop() {
       }
       if (currentMovement.movement != moveForward){
         readBackUltrasonicSensors();
-        // backSensorDetect = checkBackUltrasonicSensors();
-        backSensorDetect = 1000;
+        backSensorDetect = checkBackUltrasonicSensors();
       }
       if (((backSensorDetect != 1000) || (frontSensorDetect != 1000)) && !sensorOff) {
         currentState = AVOID_OBSTACLE;
@@ -361,6 +363,7 @@ void loop() {
       break;
   }
 }
+
 // ================================================================
 //                           Functions
 // ================================================================
@@ -375,6 +378,7 @@ const char* getMovementName(void (*movement)()) {
   if (movement == deactivateUSSensor) return "deactivateUSSensor";
   if (movement == deployBanner) return "deployBanner";
   if (movement == dropBanner) return "dropBanner";
+  if (movement == waitPAMIs) return "waitPAMIs";
   return "Unknown";
 }
 
@@ -748,39 +752,20 @@ void stopMotors() {
  *
  * @param time Le temps écoulé en dixièmes de secondes, utilisé pour déterminer le score.
  */
-void updateScore() {
-  unsigned long time = millis() - startTime;
-  int score;
-  long sec = 1000;
-  const char* smiley;
-  if (time > 100*sec) {
-    score = 45;
-  } else if (time > 90*sec) {
-    score = 39;
-  } else if (time > 20*sec) {
-    score = 24;
-  } else if (time > 10*sec) {
-    score = 20;
-  } else {
-    score = 0;
-  }
-
-  if ((time/500)%2) {
-    smiley = "(>'-')> SCORE <('-'<)";
-  } else {
-    smiley = "<('-'<) SCORE (>'-')>";
-  }
+void displayCurrentMovementName() {
+  const char* movementName = getMovementName(currentMovement.movement);
 
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0,0);
-  display.println(smiley);
+  display.setCursor(0, 0);
+  display.println("Mouvement en cours :");
   display.setTextSize(2);
-  display.setCursor(50,15);
-  display.println(score);
+  display.setCursor(10, 15);
+  display.println(movementName);
   display.display();
 }
+
 void displayWaitingMessage() {
   display.clearDisplay();
   display.setTextSize(1);
